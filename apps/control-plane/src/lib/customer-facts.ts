@@ -53,7 +53,7 @@ export async function buildCustomerFacts(
 ): Promise<CustomerFacts> {
   if (identity.kind === "guest") return guestFacts();
 
-  const [user, orderStats] = await Promise.all([
+  const [user, orderStats, profile] = await Promise.all([
     prisma.user.findUnique({
       where: { id: identity.userId },
       select: { id: true, email: true, loyaltyPoints: true },
@@ -64,6 +64,12 @@ export async function buildCustomerFacts(
       where: { storeId, userId: identity.userId, status: { not: "BLOCKED" } },
       _count: { _all: true },
       _sum: { total: true },
+    }),
+    // Administrator-defined attributes, also per store, so the same shopper can
+    // carry different attributes in different shops.
+    prisma.customerProfile.findUnique({
+      where: { storeId_userId: { storeId, userId: identity.userId } },
+      select: { values: true },
     }),
   ]);
 
@@ -83,6 +89,15 @@ export async function buildCustomerFacts(
     totalSpent,
     avgOrderValue: orderCount > 0 ? totalSpent / orderCount : 0,
     isFirstOrder: orderCount === 0,
-    attributes: {},
+    attributes: readAttributes(profile?.values),
   };
+}
+
+/**
+ * Stored profile values are already validated against the store's definitions
+ * on write, so this only has to guard against a malformed JSON column.
+ */
+function readAttributes(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as Record<string, unknown>;
 }

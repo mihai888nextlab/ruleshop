@@ -6,6 +6,7 @@ import { validateRule, validateRuleset } from "@ruleshop/engine";
 import type { Action, Condition, RuleDefinition } from "@ruleshop/engine";
 import { requireStoreRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import { loadContextSchema, loadEditorSchema } from "@/lib/context-schema";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 
@@ -96,7 +97,12 @@ export async function saveRuleInDraft(
   if (!ruleset || ruleset.status !== "draft") {
     throw new Error("Doar draft-urile pot fi editate");
   }
-  const v = validateRule(rule);
+
+  // Validate against this store's vocabulary, so a condition cannot reference a
+  // field the store does not have, or use an operator its type does not support.
+  // Authoring uses the active schema: new rules should not reach for an
+  // attribute that has been archived.
+  const v = validateRule(rule, { schema: await loadEditorSchema(store.id) });
   if (!v.ok || !v.data) throw new Error(v.errors.join("; "));
 
   await prisma.rule.upsert({
@@ -176,6 +182,9 @@ export async function publishRuleset(
   });
   if (!ruleset) throw new Error("Versiune inexistentă");
 
+  // Publishing validates against the full schema, archived attributes included:
+  // archiving one field must not block publishing rules that legitimately
+  // referenced it before.
   const check = validateRuleset(
     ruleset.rules.map((r) => ({
       key: r.key,
@@ -187,6 +196,7 @@ export async function publishRuleset(
       conditions: r.conditions,
       actions: r.actions,
     })),
+    { schema: await loadContextSchema(store.id) },
   );
   if (!check.ok) throw new Error(check.errors.join("; "));
 

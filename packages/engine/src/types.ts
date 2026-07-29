@@ -22,6 +22,31 @@ export type Condition =
   | { op: "not"; child: Condition }
   | { op: ComparisonOp; path: string; value?: unknown };
 
+export type GroupCondition = Extract<Condition, { children: Condition[] }>;
+export type NotCondition = Extract<Condition, { child: Condition }>;
+export type ComparisonCondition = Extract<Condition, { path: string }>;
+
+/**
+ * Explicit guards rather than inline `op` checks.
+ *
+ * The group variant's discriminant is itself a union (`"and" | "or"`), which
+ * TypeScript will not fully eliminate from a negated `||` chain. These also
+ * read better at the call sites that walk the tree.
+ */
+export function isGroupCondition(cond: Condition): cond is GroupCondition {
+  return cond.op === "and" || cond.op === "or";
+}
+
+export function isNotCondition(cond: Condition): cond is NotCondition {
+  return cond.op === "not";
+}
+
+export function isComparisonCondition(
+  cond: Condition,
+): cond is ComparisonCondition {
+  return !isGroupCondition(cond) && !isNotCondition(cond);
+}
+
 export type Action =
   | { type: "set"; path: string; value: unknown }
   | { type: "discountPercent"; value: number }

@@ -46,6 +46,9 @@ export default async function RulesHomePage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href={`/s/${slug}/attributes`}>
+            <Button variant="outline">Schema clientului</Button>
+          </Link>
           <Link href={`/s/${slug}/rules/test`}>
             <Button variant="outline">Test harness</Button>
           </Link>

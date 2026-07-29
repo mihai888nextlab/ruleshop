@@ -44,6 +44,16 @@ enum AiSuggestionStatus {
   rejected
 }
 
+/// Data types an administrator can give a customer attribute. Mirrors FieldType
+/// in @ruleshop/engine, which decides valid operators per type.
+enum AttributeType {
+  string
+  number
+  boolean
+  enum
+  date
+}
+
 model Store {
   id        String   @id @default(cuid())
   slug      String   @unique
@@ -64,6 +74,64 @@ model Store {
   evaluations   Evaluation[]
   auditLogs     AuditLog[]
   aiSuggestions AiSuggestion[]
+  attributeDefs CustomerAttributeDef[]
+  profiles      CustomerProfile[]
+}
+
+/// An administrator-defined customer field.
+///
+/// Each definition adds a typed variable to this store's rule vocabulary at
+/// `customer.attributes.<key>`, offered in the rule editor with only the
+/// operators its type allows, and rendered on the storefront profile form so
+/// customers can supply the value. Adding a segmentation dimension therefore
+/// needs no code change and no deploy.
+model CustomerAttributeDef {
+  id            String        @id @default(cuid())
+  storeId       String
+  /// Slug used in rule paths. Immutable once rules may reference it.
+  key           String
+  label         String
+  description   String        @default("")
+  type          AttributeType
+  /// Allowed values for `enum` attributes; empty for every other type.
+  options       Json          @default("[]")
+  required      Boolean       @default(false)
+  /// Whether customers see and fill this field on their profile.
+  showOnProfile Boolean       @default(true)
+  /// Ordering in the profile form and the editor palette.
+  position      Int           @default(0)
+  /// Archived attributes keep stored values and stay readable by existing
+  /// rules, but are no longer offered for new ones. Deleting a referenced
+  /// attribute is refused outright.
+  archived      Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, key])
+  @@index([storeId, archived, position])
+}
+
+/// Values a customer supplied for one store's attribute definitions.
+///
+/// Scoped by store, so a shopper's profile in one shop is invisible to another
+/// even though the underlying account is shared.
+model CustomerProfile {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String
+  /// Map of attribute key to value, validated against the store's definitions
+  /// before every write.
+  values    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId])
+  @@index([userId])
 }
 
 model User {
@@ -82,6 +150,7 @@ model User {
   orders      Order[]
   auditLogs   AuditLog[]
   aiSuggestions AiSuggestion[]
+  profiles    CustomerProfile[]
 }
 
 model Membership {
