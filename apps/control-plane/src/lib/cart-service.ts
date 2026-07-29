@@ -395,6 +395,7 @@ export function buildCartResponse(input: {
     shippingOptions: options,
     shippingDecision: decisionMeta(pricing.shipping),
     loyalty: { points: loyaltyPoints, decision: decisionMeta(pricing.loyalty) },
+    fraudDecision: decisionMeta(pricing.fraud),
     blockedReason,
     merged: input.merged,
   };

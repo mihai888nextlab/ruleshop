@@ -42,6 +42,12 @@ export const cartResponseSchema = z.object({
   shippingOptions: z.array(shippingOptionSchema),
   shippingDecision: decisionMetaSchema,
   loyalty: loyaltyPreviewSchema,
+  /**
+   * The fraud evaluation for this cart, exposed even when it does not block, so
+   * checkout can show what the antifraud rules concluded rather than only
+   * reporting a refusal.
+   */
+  fraudDecision: decisionMetaSchema,
   /** Set when a fraud rule would block checkout, so the UI can warn early. */
   blockedReason: z.string().nullable(),
   /** True when a guest cart was folded into the signed-in customer's cart. */

@@ -2,7 +2,21 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import {
   apiErrorSchema,
+  authResponseSchema,
+  cartResponseSchema,
+  catalogResponseSchema,
+  checkoutResponseSchema,
+  orderDetailResponseSchema,
+  orderListResponseSchema,
+  productDetailResponseSchema,
+  profileResponseSchema,
+  profileUpdateResponseSchema,
   storeListResponseSchema,
+  type AuthResponse,
+  type CartResponse,
+  type CatalogResponse,
+  type CheckoutResponse,
+  type ProfileResponse,
   type StoreSummary,
 } from "@ruleshop/contracts";
 
@@ -27,7 +41,7 @@ function controlPlaneUrl(): string {
   const url = process.env.CONTROL_PLANE_URL;
   if (!url) {
     throw new Error(
-      "CONTROL_PLANE_URL lipsește. Vezi .env.example din rădăcina proiectului.",
+      "CONTROL_PLANE_URL lipsește. Vezi apps/storefront/.env.example.",
     );
   }
   return url.replace(/\/$/, "");
@@ -41,6 +55,8 @@ async function identityHeaders(): Promise<Record<string, string>> {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  // Sent even when authenticated: it is what allows a guest cart to be merged
+  // into the customer's on first sign-in.
   const guestId = jar.get(GUEST_COOKIE)?.value;
   if (guestId) headers["X-Guest-Id"] = guestId;
 
@@ -51,13 +67,25 @@ export async function apiFetch<T>(
   path: string,
   options: {
     schema: z.ZodType<T>;
-    method?: "GET" | "POST" | "PATCH" | "DELETE";
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     body?: unknown;
     /** Opt into caching for genuinely static reads. Decisions must never cache. */
     revalidate?: number | false;
+    /**
+     * Statuses whose body should still be parsed with `schema` rather than
+     * flattened into a message. Validation failures return 422 carrying
+     * field-level errors, which a form needs in order to render them inline.
+     */
+    acceptStatuses?: number[];
   },
 ): Promise<ApiResult<T>> {
-  const { schema, method = "GET", body, revalidate = false } = options;
+  const {
+    schema,
+    method = "GET",
+    body,
+    revalidate = false,
+    acceptStatuses = [],
+  } = options;
 
   let response: Response;
   try {
@@ -84,7 +112,7 @@ export async function apiFetch<T>(
 
   const payload: unknown = await response.json().catch(() => null);
 
-  if (!response.ok) {
+  if (!response.ok && !acceptStatuses.includes(response.status)) {
     const parsed = apiErrorSchema.safeParse(payload);
     return {
       ok: false,
@@ -107,10 +135,137 @@ export async function apiFetch<T>(
   return { ok: true, data: parsed.data };
 }
 
+const store = (slug: string) => `/api/v1/stores/${encodeURIComponent(slug)}`;
+
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
+
 export async function listStores(): Promise<ApiResult<StoreSummary[]>> {
   const result = await apiFetch("/api/v1/stores", {
     schema: storeListResponseSchema,
     revalidate: 30,
   });
   return result.ok ? { ok: true, data: result.data.stores } : result;
+}
+
+export async function getCatalog(
+  slug: string,
+  filter: { q?: string; category?: string } = {},
+): Promise<ApiResult<CatalogResponse>> {
+  const params = new URLSearchParams();
+  if (filter.q) params.set("q", filter.q);
+  if (filter.category) params.set("category", filter.category);
+  const query = params.toString();
+
+  return apiFetch(`${store(slug)}/products${query ? `?${query}` : ""}`, {
+    schema: catalogResponseSchema,
+  });
+}
+
+export async function getProduct(slug: string, productSlug: string) {
+  return apiFetch(
+    `${store(slug)}/products/${encodeURIComponent(productSlug)}`,
+    { schema: productDetailResponseSchema },
+  );
+}
+
+export async function getCart(slug: string): Promise<ApiResult<CartResponse>> {
+  return apiFetch(`${store(slug)}/cart`, { schema: cartResponseSchema });
+}
+
+export async function getOrders(slug: string) {
+  return apiFetch(`${store(slug)}/orders`, { schema: orderListResponseSchema });
+}
+
+export async function getOrder(
+  slug: string,
+  orderId: string,
+  email?: string,
+) {
+  const query = email ? `?email=${encodeURIComponent(email)}` : "";
+  return apiFetch(
+    `${store(slug)}/orders/${encodeURIComponent(orderId)}${query}`,
+    { schema: orderDetailResponseSchema },
+  );
+}
+
+export async function getProfile(
+  slug: string,
+): Promise<ApiResult<ProfileResponse>> {
+  return apiFetch(`${store(slug)}/profile`, { schema: profileResponseSchema });
+}
+
+// ---------------------------------------------------------------------------
+// Writes
+// ---------------------------------------------------------------------------
+
+export async function setCartItem(
+  slug: string,
+  productSlug: string,
+  quantity: number,
+): Promise<ApiResult<CartResponse>> {
+  return apiFetch(`${store(slug)}/cart`, {
+    schema: cartResponseSchema,
+    method: "PUT",
+    body: { productSlug, quantity },
+  });
+}
+
+export async function emptyCart(slug: string): Promise<ApiResult<CartResponse>> {
+  return apiFetch(`${store(slug)}/cart`, {
+    schema: cartResponseSchema,
+    method: "DELETE",
+  });
+}
+
+export async function checkout(
+  slug: string,
+  input: {
+    shippingMethod: string;
+    guestEmail?: string;
+    idempotencyKey: string;
+  },
+): Promise<ApiResult<CheckoutResponse>> {
+  return apiFetch(`${store(slug)}/checkout`, {
+    schema: checkoutResponseSchema,
+    method: "POST",
+    body: input,
+  });
+}
+
+export async function login(
+  slug: string,
+  email: string,
+  password: string,
+): Promise<ApiResult<AuthResponse>> {
+  return apiFetch(`${store(slug)}/auth/login`, {
+    schema: authResponseSchema,
+    method: "POST",
+    body: { email, password },
+  });
+}
+
+export async function register(
+  slug: string,
+  input: { email: string; password: string; name?: string },
+): Promise<ApiResult<AuthResponse>> {
+  return apiFetch(`${store(slug)}/auth/register`, {
+    schema: authResponseSchema,
+    method: "POST",
+    body: input,
+  });
+}
+
+export async function saveProfile(
+  slug: string,
+  values: Record<string, unknown>,
+) {
+  return apiFetch(`${store(slug)}/profile`, {
+    schema: profileUpdateResponseSchema,
+    method: "PUT",
+    body: { values },
+    // 422 carries per-field messages the form renders next to each input.
+    acceptStatuses: [422],
+  });
 }

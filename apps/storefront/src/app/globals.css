@@ -1,23 +1,85 @@
 @import "tailwindcss";
 
 /*
- * Every visual value the storefront uses is a token, because the `theme`
- * decision point lets a published rule swap the store's look at request time.
- * A theme is a `[data-theme]` block that overrides these variables and nothing
- * else, so adding a theme never means touching component code.
+ * Editorial minimal: typography and whitespace do the work, so the design does
+ * not depend on product photography it does not have.
+ *
+ * Every visual value is a token. The `theme` decision point lets a published
+ * rule restyle the shop at request time, and a theme is a `[data-theme]` block
+ * overriding these variables and nothing else — so adding one never means
+ * touching a component.
  */
-:root {
-  --bg: #faf9f7;
-  --fg: #16150f;
-  --muted: #6a675c;
+
+:root,
+[data-theme="default"] {
+  --bg: #fbfaf8;
+  --fg: #17150f;
+  --muted: #6d685c;
   --surface: #ffffff;
-  --surface-2: #f1efe9;
-  --border: #ddd9cf;
-  --accent: #16150f;
-  --accent-fg: #faf9f7;
-  --positive: #17593f;
-  --warning: #8a5a10;
-  --danger: #8f2222;
+  --surface-2: #f2f0ea;
+  --border: #ddd8cc;
+  --rule: #17150f;
+  --accent: #17150f;
+  --accent-fg: #fbfaf8;
+  --positive: #14503a;
+  --warning: #7d5210;
+  --danger: #8a2020;
+  --radius: 2px;
+  --display-weight: 400;
+  --display-tracking: -0.02em;
+}
+
+/* Atelier Nord — warm paper, deep green. */
+[data-theme="nord"] {
+  --bg: #f4f1e8;
+  --fg: #1b1a14;
+  --muted: #6a6555;
+  --surface: #fffdf7;
+  --surface-2: #eae5d7;
+  --border: #d5cdb8;
+  --rule: #14453a;
+  --accent: #14453a;
+  --accent-fg: #f7f4ec;
+  --positive: #14503a;
+  --warning: #7d5210;
+  --danger: #8a2020;
+  --radius: 2px;
+}
+
+/* Circuit Hub — cool, technical, amber accent. */
+[data-theme="circuit"] {
+  --bg: #eef1f4;
+  --fg: #10161d;
+  --muted: #5a6672;
+  --surface: #ffffff;
+  --surface-2: #dfe5ec;
+  --border: #c2ccd6;
+  --rule: #10161d;
+  --accent: #a04a08;
+  --accent-fg: #fff8f1;
+  --positive: #14503a;
+  --warning: #7d5210;
+  --danger: #8a2020;
+  --radius: 0px;
+}
+
+/*
+ * A deliberately dramatic third theme. The theme decision point is easier to
+ * believe when switching it is unmistakable rather than a subtle hue shift.
+ */
+[data-theme="midnight"] {
+  --bg: #12131a;
+  --fg: #f2f1ee;
+  --muted: #9a9aa8;
+  --surface: #1a1c25;
+  --surface-2: #23262f;
+  --border: #34384a;
+  --rule: #f2f1ee;
+  --accent: #e8c37a;
+  --accent-fg: #12131a;
+  --positive: #6fcf9f;
+  --warning: #e0b357;
+  --danger: #e88b8b;
   --radius: 2px;
 }
 
@@ -25,9 +87,41 @@ body {
   background: var(--bg);
   color: var(--fg);
   min-height: 100vh;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Theme changes arrive as a server-rendered attribute swap; easing the colour
+     change keeps a rule publish from feeling like a glitch. */
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.display {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: var(--display-weight, 400);
+  letter-spacing: var(--display-tracking, -0.02em);
+  line-height: 1.05;
 }
 
 a {
   color: inherit;
+}
+
+/* Editorial hairlines instead of cards and shadows. */
+.rule-line {
+  border-color: var(--border);
+}
+
+/* Visible focus everywhere, since the palette is low-contrast by design. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
