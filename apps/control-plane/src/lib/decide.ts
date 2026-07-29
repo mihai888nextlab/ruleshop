@@ -1,9 +1,26 @@
 import type { DecisionType, Prisma } from "@prisma/client";
 import { evaluate } from "@ruleshop/engine";
-import type { DecisionType as EngineDecisionType, RuleDefinition } from "@ruleshop/engine";
+import type {
+  DecisionType as EngineDecisionType,
+  EvaluationResult,
+  RuleDefinition,
+} from "@ruleshop/engine";
 import { isInCanary } from "./canary";
 import { prisma } from "./prisma";
 import { parseKillCategories } from "./store";
+
+/**
+ * Decision service: resolves which ruleset a subject should see, runs the
+ * engine, and records the evaluation for the history and audit views.
+ *
+ * Ruleset resolution is deliberately separate from evaluation so a page needing
+ * many decisions (a catalog pricing every product) resolves once and evaluates
+ * many times, instead of re-reading the deployment per item.
+ */
+
+export type ResolvedRuleset = NonNullable<
+  Awaited<ReturnType<typeof resolveRulesetForSubject>>
+>;
 
 export async function resolveRulesetForSubject(
   storeId: string,
@@ -19,6 +36,8 @@ export async function resolveRulesetForSubject(
   let version = dep?.stableVersion ?? null;
   let isCanary = false;
 
+  // Deterministic: the same subject always lands in the same cohort for a given
+  // store and percentage, so a customer never flips ruleset between page loads.
   if (
     dep?.canaryVersion != null &&
     dep.canaryPercent > 0 &&
@@ -40,19 +59,35 @@ export async function resolveRulesetForSubject(
   return { store, ruleset, isCanary, version };
 }
 
-function toRuleDefs(
-  rules: {
-    id: string;
-    key: string;
-    name: string;
-    description: string;
-    category: DecisionType;
-    priority: number;
-    enabled: boolean;
-    conditions: Prisma.JsonValue;
-    actions: Prisma.JsonValue;
-  }[],
-): RuleDefinition[] {
+/** Load a specific version, bypassing canary assignment. Staff-only callers. */
+export async function resolveRulesetByVersion(storeId: string, version: number) {
+  const store = await prisma.store.findUnique({
+    where: { id: storeId },
+    include: { deployment: true },
+  });
+  if (!store) return null;
+
+  const ruleset = await prisma.ruleset.findUnique({
+    where: { storeId_version: { storeId, version } },
+    include: { rules: true },
+  });
+
+  return { store, ruleset, isCanary: false, version };
+}
+
+type RuleRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  category: DecisionType;
+  priority: number;
+  enabled: boolean;
+  conditions: Prisma.JsonValue;
+  actions: Prisma.JsonValue;
+};
+
+export function toRuleDefs(rules: RuleRow[]): RuleDefinition[] {
   return rules.map((r) => ({
     id: r.id,
     key: r.key,
@@ -66,78 +101,158 @@ function toRuleDefs(
   }));
 }
 
+export interface DecisionOutcome {
+  decision: Record<string, unknown>;
+  rulesetVersion: number | null;
+  matchedRules: string[];
+  matchedRuleDetails: EvaluationResult["matchedRuleDetails"];
+  explanation: EvaluationResult["explanation"];
+  warnings: string[];
+  traceId: string;
+  isCanary: boolean;
+  evaluationId?: string;
+}
+
+/** Pure evaluation against an already-resolved ruleset. Touches no storage. */
+export function evaluateAgainst(
+  resolved: ResolvedRuleset,
+  decisionType: DecisionType,
+  context: Record<string, unknown>,
+): Omit<DecisionOutcome, "evaluationId"> {
+  const killed = parseKillCategories(
+    resolved.store.killSwitchCategories,
+  ) as EngineDecisionType[];
+
+  const result = evaluate({
+    decisionType: decisionType as EngineDecisionType,
+    context,
+    rules: resolved.ruleset ? toRuleDefs(resolved.ruleset.rules) : [],
+    killedCategories: killed,
+    killAll: resolved.store.killSwitchEnabled,
+  });
+
+  return {
+    decision: result.decision,
+    rulesetVersion: resolved.version,
+    matchedRules: result.matchedRules,
+    matchedRuleDetails: result.matchedRuleDetails,
+    explanation: result.explanation,
+    warnings: result.warnings,
+    traceId: result.traceId,
+    isCanary: resolved.isCanary,
+  };
+}
+
+function evaluationRow(
+  resolved: ResolvedRuleset,
+  storeId: string,
+  subjectKey: string,
+  decisionType: DecisionType,
+  context: Record<string, unknown>,
+  outcome: Omit<DecisionOutcome, "evaluationId">,
+) {
+  return {
+    storeId,
+    rulesetId: resolved.ruleset?.id,
+    rulesetVersion: outcome.rulesetVersion ?? undefined,
+    decisionType,
+    subjectKey,
+    context: context as object,
+    decision: outcome.decision as object,
+    matchedRules: outcome.matchedRules,
+    explanation: outcome.explanation as object,
+    warnings: outcome.warnings,
+    isCanary: outcome.isCanary,
+  };
+}
+
 export async function runDecision(input: {
   storeId: string;
   decisionType: DecisionType;
   context: Record<string, unknown>;
   subjectKey: string;
   persist?: boolean;
-  /** Override ruleset version (for test harness / simulation) */
+  /** Evaluate a specific version instead of the live one. Staff-only. */
   rulesetVersion?: number | null;
-}) {
-  const resolved = await resolveRulesetForSubject(input.storeId, input.subjectKey);
-  if (!resolved) {
-    throw new Error("Magazin inexistent");
-  }
+}): Promise<DecisionOutcome> {
+  const resolved =
+    input.rulesetVersion != null
+      ? await resolveRulesetByVersion(input.storeId, input.rulesetVersion)
+      : await resolveRulesetForSubject(input.storeId, input.subjectKey);
 
-  let ruleset = resolved.ruleset;
-  let isCanary = resolved.isCanary;
-  let version = resolved.version;
+  if (!resolved) throw new Error("Magazin inexistent");
 
-  if (input.rulesetVersion != null) {
-    ruleset = await prisma.ruleset.findUnique({
-      where: {
-        storeId_version: {
-          storeId: input.storeId,
-          version: input.rulesetVersion,
-        },
-      },
-      include: { rules: true },
-    });
-    version = input.rulesetVersion;
-    isCanary = false;
-  }
+  const outcome = evaluateAgainst(resolved, input.decisionType, input.context);
 
-  const killed = parseKillCategories(resolved.store.killSwitchCategories) as EngineDecisionType[];
-  const result = evaluate({
-    decisionType: input.decisionType as EngineDecisionType,
-    context: input.context,
-    rules: ruleset ? toRuleDefs(ruleset.rules) : [],
-    killedCategories: killed,
-    killAll: resolved.store.killSwitchEnabled,
+  if (input.persist === false) return outcome;
+
+  const ev = await prisma.evaluation.create({
+    data: evaluationRow(
+      resolved,
+      input.storeId,
+      input.subjectKey,
+      input.decisionType,
+      input.context,
+      outcome,
+    ),
+    select: { id: true },
   });
 
-  let evaluationId: string | undefined;
-  if (input.persist !== false) {
-    const ev = await prisma.evaluation.create({
-      data: {
-        storeId: input.storeId,
-        rulesetId: ruleset?.id,
-        rulesetVersion: version ?? undefined,
-        decisionType: input.decisionType,
-        subjectKey: input.subjectKey,
-        context: input.context as object,
-        decision: result.decision as object,
-        matchedRules: result.matchedRules,
-        explanation: result.explanation as object,
-        warnings: result.warnings,
-        isCanary,
-      },
-    });
-    evaluationId = ev.id;
+  return { ...outcome, evaluationId: ev.id };
+}
+
+/**
+ * Evaluate several decisions for one subject against a single resolved ruleset,
+ * persisting them in one round trip.
+ *
+ * This is what a catalog page uses: pricing and availability for every product
+ * costs one deployment read plus one bulk insert, rather than two queries and
+ * one insert per product.
+ */
+export async function runDecisionBatch<K extends string>(input: {
+  storeId: string;
+  subjectKey: string;
+  items: {
+    key: K;
+    decisionType: DecisionType;
+    context: Record<string, unknown>;
+  }[];
+  persist?: boolean;
+}): Promise<{
+  outcomes: Map<K, Omit<DecisionOutcome, "evaluationId">>;
+  resolved: ResolvedRuleset;
+}> {
+  const resolved = await resolveRulesetForSubject(
+    input.storeId,
+    input.subjectKey,
+  );
+  if (!resolved) throw new Error("Magazin inexistent");
+
+  const outcomes = new Map<K, Omit<DecisionOutcome, "evaluationId">>();
+  const rows: ReturnType<typeof evaluationRow>[] = [];
+
+  for (const item of input.items) {
+    const outcome = evaluateAgainst(resolved, item.decisionType, item.context);
+    outcomes.set(item.key, outcome);
+    if (input.persist !== false) {
+      rows.push(
+        evaluationRow(
+          resolved,
+          input.storeId,
+          input.subjectKey,
+          item.decisionType,
+          item.context,
+          outcome,
+        ),
+      );
+    }
   }
 
-  return {
-    decision: result.decision,
-    rulesetVersion: version,
-    matchedRules: result.matchedRules,
-    matchedRuleDetails: result.matchedRuleDetails,
-    explanation: result.explanation,
-    warnings: result.warnings,
-    traceId: result.traceId,
-    isCanary,
-    evaluationId,
-  };
+  if (rows.length > 0) {
+    await prisma.evaluation.createMany({ data: rows });
+  }
+
+  return { outcomes, resolved };
 }
 
 /** Replay historical evaluations against a candidate rule list (app-side metrics). */
