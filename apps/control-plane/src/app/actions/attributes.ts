@@ -36,12 +36,34 @@ const attributeInputSchema = z.object({
   showOnProfile: z.boolean().default(true),
 });
 
-async function adminContext(slug: string) {
-  const store = await getStoreBySlug(slug);
+/**
+ * Server Actions are directly invocable HTTP endpoints: a caller can reach them
+ * with arbitrary arguments, not only through the form that renders them. So the
+ * parameters are validated here rather than trusted.
+ *
+ * Authorization is checked against the store resolved from the supplied slug, so
+ * a caller naming another store's slug is rejected for lacking a role there.
+ */
+const slugSchema = z.string().trim().min(1).max(80);
+const idSchema = z.string().trim().min(1).max(60);
+
+async function adminContext(slug: unknown) {
+  const parsedSlug = slugSchema.safeParse(slug);
+  if (!parsedSlug.success) throw new Error("Magazin invalid");
+
+  const store = await getStoreBySlug(parsedSlug.data);
   if (!store) throw new Error("Magazin inexistent");
+
   const authz = await requireStoreRole(store.id, "STORE_ADMIN");
   if (!authz.ok) throw new Error(authz.error);
+
   return { store, authz };
+}
+
+function parseId(id: unknown): string {
+  const parsed = idSchema.safeParse(id);
+  if (!parsed.success) throw new Error("Identificator invalid");
+  return parsed.data;
 }
 
 export async function createAttribute(slug: string, input: unknown) {
@@ -111,10 +133,11 @@ export async function createAttribute(slug: string, input: unknown) {
  */
 export async function updateAttribute(
   slug: string,
-  id: string,
+  rawId: unknown,
   input: unknown,
 ) {
   const { store, authz } = await adminContext(slug);
+  const id = parseId(rawId);
 
   const updateSchema = attributeInputSchema
     .omit({ key: true, type: true })
@@ -180,10 +203,12 @@ export async function updateAttribute(
  */
 export async function archiveAttribute(
   slug: string,
-  id: string,
-  archived: boolean,
+  rawId: unknown,
+  archived: unknown,
 ) {
   const { store, authz } = await adminContext(slug);
+  const id = parseId(rawId);
+  if (typeof archived !== "boolean") throw new Error("Valoare invalidă");
 
   const existing = await prisma.customerAttributeDef.findFirst({
     where: { id, storeId: store.id },
@@ -217,8 +242,9 @@ export async function archiveAttribute(
  * that no longer resolves — they would stop matching with no error anywhere.
  * The caller is told exactly which rules to fix first.
  */
-export async function deleteAttribute(slug: string, id: string) {
+export async function deleteAttribute(slug: string, rawId: unknown) {
   const { store, authz } = await adminContext(slug);
+  const id = parseId(rawId);
 
   const existing = await prisma.customerAttributeDef.findFirst({
     where: { id, storeId: store.id },
@@ -254,8 +280,12 @@ export async function deleteAttribute(slug: string, id: string) {
 }
 
 /** Reorders the profile form and editor palette. */
-export async function reorderAttributes(slug: string, orderedIds: string[]) {
+export async function reorderAttributes(slug: string, rawIds: unknown) {
   const { store, authz } = await adminContext(slug);
+
+  const parsedIds = z.array(idSchema).min(1).max(200).safeParse(rawIds);
+  if (!parsedIds.success) throw new Error("Listă de atribute invalidă");
+  const orderedIds = parsedIds.data;
 
   const owned = await prisma.customerAttributeDef.findMany({
     where: { storeId: store.id, id: { in: orderedIds } },

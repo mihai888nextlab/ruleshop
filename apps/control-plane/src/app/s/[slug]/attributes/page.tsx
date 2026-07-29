@@ -72,14 +72,19 @@ export default async function AttributesPage({
         </p>
       </header>
 
+      {/*
+        Server Actions are bound with the store slug rather than wrapped in
+        arrow functions. A closure created here is an ordinary function and
+        cannot cross into a Client Component; `bind` produces a real action
+        reference that can.
+      */}
       <AttributeManager
         attributes={attributes}
         actions={{
-          onCreate: async (input) => createAttribute(slug, input),
-          onUpdate: async (id, input) => updateAttribute(slug, id, input),
-          onArchive: async (id, archived) =>
-            archiveAttribute(slug, id, archived),
-          onDelete: async (id) => deleteAttribute(slug, id),
+          onCreate: createAttribute.bind(null, slug),
+          onUpdate: updateAttribute.bind(null, slug),
+          onArchive: archiveAttribute.bind(null, slug),
+          onDelete: deleteAttribute.bind(null, slug),
         }}
       />
 
