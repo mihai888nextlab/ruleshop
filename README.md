@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RuleShop
 
-## Getting Started
+Platformă web multi-tenant: magazine online + control plane pentru un **rule engine** implementat de la zero. Deciziile (preț, livrare, antifraudă, disponibilitate, loialitate, temă) se schimbă prin publicarea regulilor, fără republicarea codului.
 
-First, run the development server:
+## Cerințe
+
+- Node.js 20+
+- Docker (PostgreSQL)
+- Opțional: `MOONSHOT_API_KEY` pentru modulul AI (Kimi)
+
+## Pornire rapidă
 
 ```bash
+cp .env.example .env
+docker compose up -d
+npm install
+npx prisma db push
+npm run db:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Deschide [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Conturi demo
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Email | Parolă | Rol |
+|-------|--------|-----|
+| admin@ruleshop.local | admin123 | Platform admin |
+| admin@fashion.local | admin123 | Admin Atelier Nord |
+| admin@electronics.local | admin123 | Admin Circuit Hub |
+| vip@demo.local | demo123 | Client VIP |
+| client@demo.local | demo123 | Client |
 
-## Learn More
+### Magazine
 
-To learn more about Next.js, take a look at the following resources:
+- `/s/fashion` — Atelier Nord
+- `/s/electronics` — Circuit Hub
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Scripturi
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `npm run dev` — server dezvoltare
+- `npm run build` / `npm start` — producție
+- `npm test` — teste motor de reguli
+- `npm run db:seed` — date demonstrative
+- `npm run db:reset` — reset schemă + seed
 
-## Deploy on Vercel
+## Demo recomandat
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Cumpără ca guest sau VIP pe `/s/fashion` — observă reducerea VIP și panoul de decizie.
+2. Intră ca `admin@fashion.local` → **Reguli** → creează draft, modifică `vip-discount`, publică stable.
+3. Reîncarcă storefront-ul — comportament nou fără rebuild.
+4. Deschide o evaluare / pagina comenzii pentru explicație.
+5. **AI**: analizează reguli sau propune din NL → **Aprobă → draft** (nu publică automat).
+6. Rollback sau kill switch pe o categorie.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Documentație
+
+Vezi [ARCHITECTURE.md](./ARCHITECTURE.md) pentru modelul regulilor, conflicte, canary și multi-tenancy.
+
+## Variabile de mediu
+
+Vezi `.env.example`:
+
+- `DATABASE_URL`
+- `AUTH_SECRET`
+- `MOONSHOT_API_KEY` / `MOONSHOT_MODEL`
+- `NEXTAUTH_URL`

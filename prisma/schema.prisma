@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  OPERATOR
+  STORE_ADMIN
+  PLATFORM_ADMIN
+}
+
+enum RulesetStatus {
+  draft
+  published
+  canary
+  archived
+}
+
+enum DecisionType {
+  pricing
+  shipping
+  fraud
+  availability
+  loyalty
+  theme
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  CANCELLED
+  BLOCKED
+}
+
+enum AiSuggestionStatus {
+  pending
+  approved
+  rejected
+}
+
+model Store {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Kill switches: category -> true means disabled
+  killSwitchCategories Json @default("{}")
+  killSwitchEnabled    Boolean @default(false)
+
+  memberships   Membership[]
+  products      Product[]
+  carts         Cart[]
+  orders        Order[]
+  rulesets      Ruleset[]
+  deployment    Deployment?
+  evaluations   Evaluation[]
+  auditLogs     AuditLog[]
+  aiSuggestions AiSuggestion[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  /// Platform-level role; store roles live on Membership
+  platformRole Role?
+  loyaltyPoints Int     @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships Membership[]
+  carts       Cart[]
+  orders      Order[]
+  auditLogs   AuditLog[]
+  aiSuggestions AiSuggestion[]
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String
+  role      Role
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId])
+  @@index([userId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  storeId     String
+  slug        String
+  name        String
+  description String   @default("")
+  category    String   @default("general")
+  basePrice   Decimal  @db.Decimal(12, 2)
+  stock       Int      @default(0)
+  imageUrl    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  cartItems CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([storeId, slug])
+  @@index([storeId, category])
+}
+
+model Cart {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String?
+  guestId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items CartItem[]
+
+  @@index([storeId, userId])
+  @@index([storeId, guestId])
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  productId String
+  quantity  Int    @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  storeId         String
+  userId          String?
+  guestEmail      String?
+  status          OrderStatus @default(PENDING)
+  subtotal        Decimal     @db.Decimal(12, 2)
+  discountTotal   Decimal     @default(0) @db.Decimal(12, 2)
+  shippingCost    Decimal     @default(0) @db.Decimal(12, 2)
+  shippingMethod  String?
+  total           Decimal     @db.Decimal(12, 2)
+  loyaltyPointsEarned Int     @default(0)
+  decisionTrace   Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  store Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items OrderItem[]
+
+  @@index([storeId, userId])
+  @@index([storeId, createdAt])
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  productId  String
+  name       String
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(12, 2)
+  lineTotal  Decimal @db.Decimal(12, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+}
+
+model Ruleset {
+  id        String        @id @default(cuid())
+  storeId   String
+  version   Int
+  status    RulesetStatus @default(draft)
+  name      String?
+  note      String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  createdBy String?
+
+  store       Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  rules       Rule[]
+  evaluations Evaluation[]
+
+  @@unique([storeId, version])
+  @@index([storeId, status])
+}
+
+model Rule {
+  id          String       @id @default(cuid())
+  rulesetId   String
+  key         String
+  name        String
+  description String       @default("")
+  category    DecisionType
+  priority    Int          @default(100)
+  enabled     Boolean      @default(true)
+  conditions  Json
+  actions     Json
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  ruleset Ruleset @relation(fields: [rulesetId], references: [id], onDelete: Cascade)
+
+  @@unique([rulesetId, key])
+  @@index([rulesetId, category, priority])
+}
+
+model Deployment {
+  id             String  @id @default(cuid())
+  storeId        String  @unique
+  stableVersion  Int?
+  canaryVersion  Int?
+  canaryPercent  Int     @default(0)
+  updatedAt      DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model Evaluation {
+  id              String       @id @default(cuid())
+  storeId         String
+  rulesetId       String?
+  rulesetVersion  Int?
+  decisionType    DecisionType
+  subjectKey      String?
+  context         Json
+  decision        Json
+  matchedRules    Json
+  explanation     Json
+  warnings        Json         @default("[]")
+  isCanary        Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+
+  store   Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  ruleset Ruleset? @relation(fields: [rulesetId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, decisionType, createdAt])
+  @@index([storeId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  storeId   String?
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  store Store? @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+}
+
+model AiSuggestion {
+  id          String             @id @default(cuid())
+  storeId     String
+  userId      String?
+  kind        String
+  prompt      String?
+  proposal    Json
+  metrics     Json?
+  confidence  Float?
+  status      AiSuggestionStatus @default(pending)
+  reviewNote  String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, status])
+}
