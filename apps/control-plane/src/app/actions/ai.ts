@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { RuleDefinition } from "@/engine";
-import { validateRule } from "@/engine";
+import type { RuleDefinition } from "@ruleshop/engine";
+import { validateRule } from "@ruleshop/engine";
 import {
   extractJson,
   kimiChat,

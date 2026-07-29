@@ -1,6 +1,6 @@
 import type { DecisionType, Prisma } from "@prisma/client";
-import { evaluate } from "@/engine";
-import type { DecisionType as EngineDecisionType, RuleDefinition } from "@/engine";
+import { evaluate } from "@ruleshop/engine";
+import type { DecisionType as EngineDecisionType, RuleDefinition } from "@ruleshop/engine";
 import { isInCanary } from "./canary";
 import { prisma } from "./prisma";
 import { parseKillCategories } from "./store";

@@ -1,14 +1,10 @@
 import { defineConfig } from "vitest/config";
-import path from "path";
 
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
-  },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
+    // Engine and contract tests live with their package; app-level tests live
+    // with their app. One root runner keeps `npm test` a single command.
+    include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts"],
   },
 });

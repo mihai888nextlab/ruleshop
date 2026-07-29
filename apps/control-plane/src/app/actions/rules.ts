@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import type { DecisionType, RulesetStatus } from "@prisma/client";
-import { validateRule, validateRuleset } from "@/engine";
-import type { Action, Condition, RuleDefinition } from "@/engine";
+import { validateRule, validateRuleset } from "@ruleshop/engine";
+import type { Action, Condition, RuleDefinition } from "@ruleshop/engine";
 import { requireStoreRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";

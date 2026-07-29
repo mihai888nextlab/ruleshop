@@ -1,6 +1,6 @@
 import { PrismaClient, type DecisionType, type Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import type { Action, Condition } from "../src/engine/types";
+import type { Action, Condition } from "@ruleshop/engine";
 
 const prisma = new PrismaClient();
 

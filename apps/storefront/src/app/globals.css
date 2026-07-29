@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+/*
+ * Every visual value the storefront uses is a token, because the `theme`
+ * decision point lets a published rule swap the store's look at request time.
+ * A theme is a `[data-theme]` block that overrides these variables and nothing
+ * else, so adding a theme never means touching component code.
+ */
+:root {
+  --bg: #faf9f7;
+  --fg: #16150f;
+  --muted: #6a675c;
+  --surface: #ffffff;
+  --surface-2: #f1efe9;
+  --border: #ddd9cf;
+  --accent: #16150f;
+  --accent-fg: #faf9f7;
+  --positive: #17593f;
+  --warning: #8a5a10;
+  --danger: #8f2222;
+  --radius: 2px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}

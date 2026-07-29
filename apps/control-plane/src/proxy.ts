@@ -3,7 +3,13 @@ import type { NextRequest } from "next/server";
 
 export const GUEST_COOKIE = "rs_guest";
 
-export function middleware(request: NextRequest) {
+/**
+ * Control-plane requests are staff traffic, so the only thing handled here is
+ * issuing a stable anonymous id. It is what deterministic canary bucketing
+ * hashes on when a decision is requested without a logged-in user, which keeps
+ * rule-editor previews in the same cohort across reloads.
+ */
+export function proxy(request: NextRequest) {
   const res = NextResponse.next();
   if (!request.cookies.get(GUEST_COOKIE)?.value) {
     res.cookies.set(GUEST_COOKIE, `g_${crypto.randomUUID()}`, {

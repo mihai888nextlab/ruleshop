@@ -1,6 +1,6 @@
 import OpenAI from "openai";
-import { validateRule } from "@/engine";
-import type { RuleDefinition } from "@/engine";
+import { validateRule } from "@ruleshop/engine";
+import type { RuleDefinition } from "@ruleshop/engine";
 
 export function getKimiClient() {
   const apiKey = process.env.MOONSHOT_API_KEY;
