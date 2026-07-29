@@ -99,22 +99,22 @@ export const ruleDefinitionSchema = z.object({
   id: z.string().optional(),
   key: z
     .string()
-    .min(1)
-    .regex(/^[a-z0-9-]+$/, "key trebuie să fie slug (a-z, 0-9, -)"),
-  name: z.string().min(1),
+    .min(1, "cheia este obligatorie")
+    .regex(/^[a-z0-9-]+$/, "cheia trebuie să fie slug (a-z, 0-9, -)"),
+  name: z.string().min(1, "numele este obligatoriu"),
   description: z.string().optional(),
-  category: z.enum([
-    "pricing",
-    "shipping",
-    "fraud",
-    "availability",
-    "loyalty",
-    "theme",
-  ]),
-  priority: z.number().int(),
+  category: z.enum(
+    ["pricing", "shipping", "fraud", "availability", "loyalty", "theme"],
+    "tip de decizie necunoscut",
+  ),
+  priority: z.number("prioritatea trebuie să fie un număr").int(
+    "prioritatea trebuie să fie un număr întreg",
+  ),
   enabled: z.boolean(),
   conditions: conditionSchema,
-  actions: z.array(actionSchema).min(1),
+  actions: z
+    .array(actionSchema)
+    .min(1, "o regulă are nevoie de cel puțin o acțiune"),
 });
 
 /**

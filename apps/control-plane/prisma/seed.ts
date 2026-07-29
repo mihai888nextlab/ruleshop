@@ -74,6 +74,8 @@ async function main() {
   await prisma.ruleset.deleteMany();
   await prisma.deployment.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.customerProfile.deleteMany();
+  await prisma.customerAttributeDef.deleteMany();
   await prisma.membership.deleteMany();
   await prisma.store.deleteMany();
   await prisma.user.deleteMany();
@@ -389,7 +391,86 @@ async function main() {
     },
   ]);
 
-  // Draft v2 for fashion (for versioning/diff demos)
+  /**
+   * Administrator-defined customer attributes.
+   *
+   * The two stores deliberately define different fields. Each store's rules can
+   * only reference its own, which is what tenant isolation means for the schema:
+   * Atelier Nord has no notion of a warranty plan, and Circuit Hub has no notion
+   * of a preferred city.
+   */
+  await prisma.customerAttributeDef.createMany({
+    data: [
+      {
+        storeId: fashion.id,
+        key: "city",
+        label: "Oraș",
+        description: "Orașul de livrare preferat",
+        type: "enum",
+        options: ["Cluj", "Iași", "Timișoara", "București"],
+        showOnProfile: true,
+        position: 0,
+      },
+      {
+        storeId: fashion.id,
+        key: "birthday",
+        label: "Zi de naștere",
+        description: "Folosită pentru campanii aniversare",
+        type: "date",
+        showOnProfile: true,
+        position: 1,
+      },
+      {
+        storeId: fashion.id,
+        key: "newsletter",
+        label: "Abonat la newsletter",
+        type: "boolean",
+        showOnProfile: true,
+        position: 2,
+      },
+      {
+        storeId: electronics.id,
+        key: "warranty_plan",
+        label: "Plan de garanție",
+        description: "Nivelul de garanție ales de client",
+        type: "enum",
+        options: ["basic", "extended", "pro"],
+        showOnProfile: true,
+        position: 0,
+      },
+      {
+        storeId: electronics.id,
+        key: "business_account",
+        label: "Cont de firmă",
+        type: "boolean",
+        showOnProfile: true,
+        position: 1,
+      },
+    ],
+  });
+
+  // Profile values, per store, for the same shared account.
+  await prisma.customerProfile.createMany({
+    data: [
+      {
+        storeId: fashion.id,
+        userId: vipCustomer.id,
+        values: { city: "Cluj", birthday: "1994-03-15", newsletter: true },
+      },
+      {
+        storeId: electronics.id,
+        userId: vipCustomer.id,
+        values: { warranty_plan: "pro", business_account: false },
+      },
+      {
+        storeId: fashion.id,
+        userId: customer.id,
+        values: { city: "București", newsletter: false },
+      },
+    ],
+  });
+
+  // Draft v2 for fashion (for versioning/diff demos, and to open in the editor)
   await createRuleset(fashion.id, 2, "draft", [
     {
       key: "vip-discount",
@@ -407,6 +488,25 @@ async function main() {
       priority: 30,
       conditions: { op: "eq", path: "product.category", value: "shoes" },
       actions: [{ type: "discountPercent", value: 5 }],
+    },
+    {
+      // Exercises a store-defined attribute, a nested group and a negation, so
+      // the visual editor has something structural to open with.
+      key: "cluj-loyal-local",
+      name: "Client fidel din Cluj",
+      description:
+        "Reducere pentru clienți din Cluj abonați la newsletter, exceptând prima comandă",
+      category: "pricing",
+      priority: 200,
+      conditions: {
+        op: "and",
+        children: [
+          { op: "eq", path: "customer.attributes.city", value: "Cluj" },
+          { op: "eq", path: "customer.attributes.newsletter", value: true },
+          { op: "not", child: { op: "eq", path: "customer.isFirstOrder", value: true } },
+        ],
+      },
+      actions: [{ type: "discountPercent", value: 25 }],
     },
   ]);
 
@@ -429,6 +529,10 @@ async function main() {
   console.log("  vip@demo.local / demo123");
   console.log("  client@demo.local / demo123");
   console.log("Stores: /s/fashion  /s/electronics");
+  console.log(
+    "Customer schema: /s/fashion/attributes (city, birthday, newsletter)",
+  );
+  console.log("Visual rule editor: /s/fashion/rules/2 (draft)");
 }
 
 main()
