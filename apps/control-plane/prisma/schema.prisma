@@ -371,6 +371,24 @@ model AiSuggestion {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
+  /// Traceability for every AI evaluation. Which model produced this, under
+  /// which prompt revision, how long it took, and what it actually returned —
+  /// so a suggestion acted on months ago can still be accounted for, and a
+  /// change in model or prompt is visible rather than silent.
+  model         String?
+  promptVersion String?
+  latencyMs     Int?
+  tokensPrompt  Int?
+  tokensOutput  Int?
+  /// The model's unparsed reply, kept because a suggestion is only auditable if
+  /// the original text can be re-read rather than just its parsed result.
+  rawResponse   String?
+  /// Findings and statistics computed by this application, kept separate from
+  /// anything the model said so the two can never be confused.
+  analysis      Json?
+  /// Rule this suggestion is about, when it targets an existing one.
+  targetRuleKey String?
+
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 

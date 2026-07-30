@@ -7,3 +7,5 @@ export * from "./path";
 export * from "./schema";
 export * from "./describe";
 export * from "./diff";
+export * from "./analysis";
+export * from "./simulate";
