@@ -1,35 +1,44 @@
-"use client";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { login, register } from "@/lib/api";
+import { useRuleShop } from "@/sdk/RuleShopProvider";
 
-import { useActionState } from "react";
-import type { ActionState } from "@/app/actions";
-
-/**
- * Sign-in and registration.
- *
- * Both call the control plane, which is the only side that ever sees a password
- * or a hash. The token it returns is stored in an httpOnly cookie by the server
- * action, so it never reaches client JavaScript.
- */
-export function AuthForm({
-  action,
-  mode,
-}: {
-  action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
-  mode: "login" | "register";
-}) {
-  const [state, formAction, pending] = useActionState(action, null);
+export function AuthForm({ mode }: { mode: "login" | "register" }) {
+  const navigate = useNavigate();
+  const { retry } = useRuleShop();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const isRegister = mode === "register";
 
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
+    const name = form.get("name") ? String(form.get("name")) : undefined;
+
+    const result = isRegister
+      ? await register({ email, password, name })
+      : await login(email, password);
+
+    setPending(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    retry();
+    navigate("/");
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {isRegister && (
         <label className="flex flex-col gap-1 text-sm">
           Nume
-          <input
-            name="name"
-            autoComplete="name"
-            className="border-b border-[var(--border)] bg-transparent py-1.5 outline-none focus:border-[var(--accent)]"
-          />
+          <input name="name" autoComplete="name" className="field" />
         </label>
       )}
 
@@ -40,7 +49,7 @@ export function AuthForm({
           type="email"
           required
           autoComplete="email"
-          className="border-b border-[var(--border)] bg-transparent py-1.5 outline-none focus:border-[var(--accent)]"
+          className="field"
         />
       </label>
 
@@ -52,7 +61,7 @@ export function AuthForm({
           required
           minLength={isRegister ? 8 : undefined}
           autoComplete={isRegister ? "new-password" : "current-password"}
-          className="border-b border-[var(--border)] bg-transparent py-1.5 outline-none focus:border-[var(--accent)]"
+          className="field"
         />
         {isRegister && (
           <span className="text-xs text-[var(--muted)]">
@@ -61,26 +70,40 @@ export function AuthForm({
         )}
       </label>
 
-      {state?.error && (
+      {error && (
         <p
           role="alert"
           className="border border-[var(--danger)] px-3 py-2 text-sm text-[var(--danger)]"
         >
-          {state.error}
+          {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="border border-[var(--accent)] bg-[var(--accent)] px-4 py-2.5 text-sm text-[var(--accent-fg)] disabled:opacity-60"
-      >
+      <button type="submit" disabled={pending} className="btn disabled:opacity-60">
         {pending
           ? "Se procesează…"
           : isRegister
             ? "Creează cont"
             : "Autentifică-te"}
       </button>
+
+      <p className="text-sm text-[var(--muted)]">
+        {isRegister ? (
+          <>
+            Ai deja cont?{" "}
+            <Link to="/login" className="underline">
+              Autentifică-te
+            </Link>
+          </>
+        ) : (
+          <>
+            Cont nou?{" "}
+            <Link to="/register" className="underline">
+              Înregistrează-te
+            </Link>
+          </>
+        )}
+      </p>
     </form>
   );
 }

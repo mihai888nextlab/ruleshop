@@ -61,7 +61,7 @@ export async function GET(
     const store = await findStoreBySlug(slug);
     if (!store) return apiError("Magazin inexistent", 404);
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     if (identity.kind !== "user") {
       return apiError("Autentificare necesară", 401);
     }
@@ -96,7 +96,7 @@ export async function PUT(
     const store = await findStoreBySlug(slug);
     if (!store) return apiError("Magazin inexistent", 404);
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     if (identity.kind !== "user") {
       return apiError("Autentificare necesară", 401);
     }

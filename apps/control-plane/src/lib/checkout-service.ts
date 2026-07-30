@@ -290,8 +290,13 @@ export async function placeOrder(input: {
       await tx.cartItem.deleteMany({ where: { cartId } });
 
       if (identity.kind === "user" && loyaltyPoints > 0) {
-        await tx.user.update({
-          where: { id: identity.userId },
+        await tx.membership.update({
+          where: {
+            storeId_userId: {
+              storeId: store.id,
+              userId: identity.userId,
+            },
+          },
           data: { loyaltyPoints: { increment: loyaltyPoints } },
         });
       }

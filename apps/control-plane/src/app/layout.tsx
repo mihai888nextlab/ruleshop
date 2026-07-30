@@ -1,21 +1,18 @@
 import type { Metadata } from "next";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/session-provider";
 
-const display = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-});
-
-const body = Source_Sans_3({
+const sans = IBM_Plex_Sans({
   variable: "--font-body",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "RuleShop",
-  description: "Magazin online cu rule engine configurabil",
+  title: "RuleShop Control Plane",
+  description: "Administrare reguli, magazine și decizii",
 };
 
 export default function RootLayout({
@@ -24,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ro" className={`${display.variable} ${body.variable} h-full`}>
+    <html lang="ro" className={`${sans.variable} h-full`}>
       <body className="min-h-full antialiased">
         <SessionProvider>{children}</SessionProvider>
       </body>

@@ -1,8 +1,26 @@
+import { createHash } from "crypto";
 import { PrismaClient, type DecisionType, type Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import type { Action, Condition } from "@ruleshop/engine";
 
 const prisma = new PrismaClient();
+
+/** Stable demo keys so local storefront .env can document them. */
+const DEMO_KEYS = {
+  fashion: "rsk_demo_atelier_nord_dev_only_0001",
+  electronics: "rsk_demo_circuit_hub_dev_only_0001",
+} as const;
+
+async function seedApiKey(storeId: string, plaintext: string, name: string) {
+  await prisma.storeApiKey.create({
+    data: {
+      storeId,
+      name,
+      keyPrefix: plaintext.slice(0, 12),
+      keyHash: createHash("sha256").update(plaintext).digest("hex"),
+    },
+  });
+}
 
 async function upsertUser(
   email: string,
@@ -19,7 +37,6 @@ async function upsertUser(
       passwordHash,
       name,
       platformRole: platformRole ?? null,
-      loyaltyPoints: email.includes("vip") ? 500 : 50,
     },
   });
 }
@@ -78,6 +95,7 @@ async function main() {
   await prisma.customerProfile.deleteMany();
   await prisma.customerAttributeDef.deleteMany();
   await prisma.membership.deleteMany();
+  await prisma.storeApiKey.deleteMany();
   await prisma.store.deleteMany();
   await prisma.user.deleteMany();
 
@@ -115,17 +133,54 @@ async function main() {
     },
   });
 
-  const memberships: { storeId: string; userId: string; role: Role }[] = [
+  const memberships: {
+    storeId: string;
+    userId: string;
+    role: Role;
+    loyaltyPoints?: number;
+  }[] = [
     { storeId: fashion.id, userId: fashionAdmin.id, role: "STORE_ADMIN" },
     { storeId: electronics.id, userId: electronicsAdmin.id, role: "STORE_ADMIN" },
-    { storeId: fashion.id, userId: vipCustomer.id, role: "CUSTOMER" },
-    { storeId: fashion.id, userId: customer.id, role: "CUSTOMER" },
-    { storeId: electronics.id, userId: customer.id, role: "CUSTOMER" },
-    { storeId: electronics.id, userId: vipCustomer.id, role: "CUSTOMER" },
+    {
+      storeId: fashion.id,
+      userId: vipCustomer.id,
+      role: "CUSTOMER",
+      loyaltyPoints: 500,
+    },
+    {
+      storeId: fashion.id,
+      userId: customer.id,
+      role: "CUSTOMER",
+      loyaltyPoints: 50,
+    },
+    {
+      storeId: electronics.id,
+      userId: customer.id,
+      role: "CUSTOMER",
+      loyaltyPoints: 50,
+    },
+    // VIP points are fashion-only — electronics membership starts at 0 to
+    // demonstrate per-tenant loyalty isolation.
+    {
+      storeId: electronics.id,
+      userId: vipCustomer.id,
+      role: "CUSTOMER",
+      loyaltyPoints: 0,
+    },
   ];
   for (const m of memberships) {
-    await prisma.membership.create({ data: m });
+    await prisma.membership.create({
+      data: {
+        storeId: m.storeId,
+        userId: m.userId,
+        role: m.role,
+        loyaltyPoints: m.loyaltyPoints ?? 0,
+      },
+    });
   }
+
+  await seedApiKey(fashion.id, DEMO_KEYS.fashion, "demo");
+  await seedApiKey(electronics.id, DEMO_KEYS.electronics, "demo");
 
   await prisma.product.createMany({
     data: [
@@ -685,7 +740,11 @@ async function main() {
   console.log("  admin@electronics.local / admin123");
   console.log("  vip@demo.local / demo123");
   console.log("  client@demo.local / demo123");
-  console.log("Stores: /s/fashion  /s/electronics");
+  console.log("Stores: /s/fashion  /s/electronics (demo)");
+  console.log("Open a store (no hardcoding): /register");
+  console.log("Store API keys (storefront):");
+  console.log(`  fashion:     ${DEMO_KEYS.fashion}`);
+  console.log(`  electronics: ${DEMO_KEYS.electronics}`);
   console.log(
     "Customer schema: /s/fashion/attributes (city, birthday, newsletter)",
   );

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000" role="img" aria-label="Product placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#e4e7e3"/>
+      <stop offset="100%" stop-color="#c9cfc9"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <circle cx="400" cy="420" r="120" fill="none" stroke="#1a1f1c" stroke-width="1.5" opacity="0.25"/>
+  <text x="400" y="720" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" letter-spacing="0.22em" fill="#1a1f1c" opacity="0.4">PLACEHOLDER</text>
+</svg>

@@ -87,6 +87,28 @@ model Store {
   attributeDefs CustomerAttributeDef[]
   profiles      CustomerProfile[]
   themes        Theme[]
+  apiKeys       StoreApiKey[]
+}
+
+/// Storefront connection credential.
+///
+/// The plaintext key is shown once at creation; only a hash is stored. The
+/// storefront sends it on every request so the control plane can resolve the
+/// store without trusting a client-supplied storeId.
+model StoreApiKey {
+  id        String    @id @default(cuid())
+  storeId   String
+  name      String    @default("default")
+  /// First characters of the plaintext key, for display in the dashboard.
+  keyPrefix String
+  /// SHA-256 hex of the full plaintext key.
+  keyHash   String    @unique
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, revokedAt])
 }
 
 /// A visual theme composed by an administrator.
@@ -178,7 +200,6 @@ model User {
   passwordHash String
   /// Platform-level role; store roles live on Membership
   platformRole Role?
-  loyaltyPoints Int     @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -191,11 +212,13 @@ model User {
 }
 
 model Membership {
-  id        String   @id @default(cuid())
-  storeId   String
-  userId    String
-  role      Role
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  storeId       String
+  userId        String
+  role          Role
+  /// Loyalty balance for this store only — never shared across tenants.
+  loyaltyPoints Int      @default(0)
+  createdAt     DateTime @default(now())
 
   store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)

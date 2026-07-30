@@ -9,8 +9,11 @@ import {
   type RuleDefinition,
   type RuleDiff,
   type RuleFinding,
+  type RuleImpact,
   type RulesetAnalysis,
+  type SimulationResult,
 } from "@ruleshop/engine";
+import type { FraudStats } from "./fraud-analysis";
 
 /**
  * The AI module's boundary with the language model.
@@ -30,7 +33,7 @@ import {
  * Bumped whenever a prompt changes materially. Stored with each suggestion, so an
  * old result stays interpretable against the prompt that produced it.
  */
-export const PROMPT_VERSION = "2026-07-30.1";
+export const PROMPT_VERSION = "2026-07-30.2";
 
 export interface ModelCall {
   content: string;
@@ -45,23 +48,71 @@ export type AiResult<T> =
   | { ok: false; error: string; call: ModelCall | null };
 
 export function isAiConfigured(): boolean {
-  return Boolean(process.env.MOONSHOT_API_KEY);
+  return Boolean(process.env.GEMINI_API_KEY);
 }
 
 function client(): OpenAI {
-  const apiKey = process.env.MOONSHOT_API_KEY;
-  if (!apiKey) throw new Error("MOONSHOT_API_KEY lipsește din mediu");
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY lipsește din mediu");
+  // Gemini's OpenAI-compatible endpoint keeps the same chat.completions shape
+  // we already use for extraction / narration.
   return new OpenAI({
     apiKey,
-    baseURL: "https://api.moonshot.ai/v1",
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
     // A rule author is waiting on this; failing fast beats a hung page.
     timeout: 45_000,
-    maxRetries: 1,
+    // 429s on free tier are common; a couple of retries help brief rate windows.
+    maxRetries: 2,
   });
 }
 
 function modelName(): string {
-  return process.env.MOONSHOT_MODEL || "kimi-k2.5";
+  // gemini-2.0-flash often has free-tier quota 0 for new keys; the "latest"
+  // flash alias tracks a model that still accepts free traffic.
+  return process.env.GEMINI_MODEL || "gemini-flash-latest";
+}
+
+function formatModelError(cause: unknown): string {
+  if (!cause || typeof cause !== "object") {
+    return "Apelul către model a eșuat";
+  }
+
+  const err = cause as {
+    status?: number;
+    message?: string;
+    error?: { message?: string; code?: number | string };
+  };
+  const status = err.status;
+  const detail =
+    (typeof err.error?.message === "string" && err.error.message) ||
+    (typeof err.message === "string" ? err.message : "");
+
+  if (status === 429 || /\b429\b/.test(detail)) {
+    return (
+      `Cotă Gemini epuizată sau limită de rată (429) pe modelul „${modelName()}”. ` +
+      `Încearcă din nou peste un minut, setează GEMINI_MODEL=gemini-flash-latest, ` +
+      `sau verifică billing/quota la https://ai.dev/rate-limit.`
+    );
+  }
+
+  if (status === 404 || /not found|no longer available/i.test(detail)) {
+    return (
+      `Modelul „${modelName()}” nu este disponibil pentru această cheie. ` +
+      `Schimbă GEMINI_MODEL (ex. gemini-flash-latest).`
+    );
+  }
+
+  if (status === 401 || status === 403) {
+    return "Cheia GEMINI_API_KEY este invalidă sau fără acces. Verifică cheia în Google AI Studio.";
+  }
+
+  if (detail && detail !== "429 status code (no body)") {
+    return `Apelul către model a eșuat: ${detail}`;
+  }
+
+  return status
+    ? `Apelul către model a eșuat (HTTP ${status})`
+    : "Apelul către model a eșuat";
 }
 
 async function callModel(
@@ -72,7 +123,7 @@ async function callModel(
     return {
       ok: false,
       error:
-        "Modulul AI nu este configurat (MOONSHOT_API_KEY lipsește). Analiza statistică rămâne disponibilă.",
+        "Modulul AI nu este configurat (GEMINI_API_KEY lipsește). Analiza statistică rămâne disponibilă.",
       call: null,
     };
   }
@@ -103,10 +154,7 @@ async function callModel(
   } catch (cause) {
     return {
       ok: false,
-      error:
-        cause instanceof Error
-          ? `Apelul către model a eșuat: ${cause.message}`
-          : "Apelul către model a eșuat",
+      error: formatModelError(cause),
       call: {
         content: "",
         model: modelName(),
@@ -160,6 +208,19 @@ function findingLine(finding: RuleFinding): string {
   return `- [${finding.code}] ${finding.key}${related}: ${finding.message}`;
 }
 
+function money(value: number): string {
+  return `${value.toFixed(2)} RON`;
+}
+
+/** One measured rule, as a line the model can only restate. */
+function impactLine(impact: RuleImpact): string {
+  return (
+    `- ${impact.key} (${impact.category}): ${impact.matched} potriviri, ` +
+    `${impact.decisionsChanged} decizii schimbate, venit ${money(impact.revenueDelta)}, ` +
+    `cost reduceri ${money(impact.discountCostDelta)}, verdict ${impact.verdict}`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Narrating analysis the application computed
 // ---------------------------------------------------------------------------
@@ -171,6 +232,7 @@ export async function narrateAnalysis(
   const usage = analysis.usage
     .map((u) => `- ${u.key}: ${u.matched} potriviri, ${u.won} câștigate`)
     .join("\n");
+  const impacts = analysis.impacts.map(impactLine).join("\n");
 
   return callModel([
     {
@@ -180,20 +242,270 @@ Primești constatări și statistici DEJA CALCULATE de aplicație. Sarcina ta es
 REGULI STRICTE:
 - Nu inventa cifre. Folosește exclusiv numerele din datele primite.
 - Nu afirma că o regulă e redundantă dacă nu apare în constatări.
+- Impactul este măsurat prin reluarea istoricului cu fiecare regulă scoasă pe rând: „venit” negativ înseamnă că regula acordă reduceri, nu că pierde bani degeaba.
 - Spune ce ar trebui reparat primul și de ce.
-- Maxim 200 de cuvinte.`,
+- Maxim 220 de cuvinte.`,
     },
     {
       role: "user",
       content: `Eșantion analizat: ${analysis.sampleSize} evaluări.
+Contexte reluate pentru impact: ${analysis.replaySampleSize}.
 
 Constatări:
 ${findings || "(nicio constatare)"}
 
 Utilizare pe regulă:
-${usage || "(nicio regulă)"}`,
+${usage || "(nicio regulă)"}
+
+Impact măsurat pe regulă:
+${impacts || "(nu s-a măsurat impactul — lipsesc contextele salvate)"}`,
     },
   ]);
+}
+
+// ---------------------------------------------------------------------------
+// Narrating a simulation the application computed
+// ---------------------------------------------------------------------------
+
+/**
+ * Explains a candidate-versus-live simulation in plain language.
+ *
+ * Every number handed over was produced by replaying recorded traffic. The model
+ * is given the sample adequacy too, because a confident story about twelve
+ * evaluations is worse than no story at all, and it is told to say so.
+ */
+export async function narrateSimulation(input: {
+  label: string;
+  simulation: SimulationResult;
+}): Promise<AiResult<string>> {
+  const deltas = input.simulation.deltas
+    .filter((delta) => delta.delta !== 0)
+    .map(
+      (delta) =>
+        `- ${delta.label}: ${delta.before} → ${delta.after} (${delta.delta > 0 ? "+" : ""}${delta.delta}${
+          delta.percentChange === null ? "" : `, ${delta.percentChange}%`
+        })`,
+    )
+    .join("\n");
+
+  const hits = input.simulation.ruleHitChanges
+    .slice(0, 12)
+    .map((row) => `- ${row.key}: ${row.before} → ${row.after} potriviri`)
+    .join("\n");
+
+  return callModel([
+    {
+      role: "system",
+      content: `Explici în română rezultatul unei simulări dintr-un rule engine, pentru un administrator de magazin.
+Cifrele au fost calculate de aplicație prin reluarea evaluărilor reale pe regulile candidat.
+REGULI STRICTE:
+- Nu inventa cifre și nu recalcula nimic; folosește exclusiv valorile primite.
+- Spune clar dacă eșantionul este prea mic pentru o concluzie.
+- Descrie efectul pentru clienți și pentru magazin, apoi riscul principal.
+- Nu recomanda publicarea; decizia este a omului.
+- Maxim 180 de cuvinte.`,
+    },
+    {
+      role: "user",
+      content: `${input.label}
+Eșantion: ${input.simulation.current.sampleSize} evaluări reluate (${input.simulation.sampleAdequacy}).
+
+Metrici schimbate:
+${deltas || "(nicio metrică nu se schimbă)"}
+
+Potriviri pe regulă:
+${hits || "(nicio schimbare de potriviri)"}`,
+    },
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// Fraud incident triage
+// ---------------------------------------------------------------------------
+
+export const FRAUD_CLASSES = [
+  "likely-fraud",
+  "false-positive",
+  "needs-review",
+] as const;
+
+export type FraudClass = (typeof FRAUD_CLASSES)[number];
+
+export interface FraudClassification {
+  orderId: string;
+  classification: FraudClass;
+  reason: string;
+}
+
+export interface FraudTriage {
+  summary: string;
+  recommendation: string;
+  classifications: FraudClassification[];
+  /**
+   * Entries the model returned that could not be used: an order id that is not
+   * in this store's incident list, or a label outside the fixed set. Kept and
+   * shown rather than silently discarded, since a model referring to orders that
+   * do not exist is something a reviewer should see.
+   */
+  dropped: string[];
+}
+
+/**
+ * Classifies refused checkouts.
+ *
+ * The statistics are the application's and are passed in read-only. The model
+ * contributes exactly two things: a label from a closed set for each incident,
+ * and prose. It cannot invent an incident — ids not in the list are dropped — and
+ * it cannot change a figure, because it is never asked for one.
+ */
+export async function classifyFraudIncidents(input: {
+  stats: FraudStats;
+}): Promise<AiResult<FraudTriage>> {
+  const { stats } = input;
+
+  if (stats.incidents.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Nu există comenzi blocate în perioada analizată, deci nu este nimic de triat.",
+      call: null,
+    };
+  }
+
+  const incidentLines = stats.incidents
+    .map(
+      (incident) =>
+        `- id=${incident.orderId} total=${money(incident.total)} ` +
+        `client=${incident.customer ?? "necunoscut"} ` +
+        `autenticat=${incident.authenticated ? "da" : "nu"} ` +
+        `reguli=${incident.matchedRules.join("+") || "niciuna"} ` +
+        `comenzi_plătite_anterior=${incident.priorPaidOrders} ` +
+        `blocări_anterioare=${incident.priorBlockedOrders} ` +
+        `motiv=${incident.reason ?? "nespecificat"}`,
+    )
+    .join("\n");
+
+  const ruleLines = stats.byRule
+    .map(
+      (row) =>
+        `- ${row.key}: ${row.blocked} blocări, ${money(row.blockedValue)} refuzați`,
+    )
+    .join("\n");
+
+  const result = await callModel([
+    {
+      role: "system",
+      content: `Triezi incidente antifraudă pentru RuleShop.
+
+Primești statistici CALCULATE de aplicație și o listă de comenzi blocate real.
+Răspunde DOAR cu JSON:
+{
+  "summary": "ce arată tiparul, pe scurt",
+  "classifications": [
+    {"orderId": "<exact unul din id-urile primite>", "classification": "likely-fraud" | "false-positive" | "needs-review", "reason": "de ce, pe baza datelor primite"}
+  ],
+  "recommendation": "ce ajustare de reguli merită analizată de un om"
+}
+
+REGULI STRICTE:
+- Folosește exclusiv id-urile primite. Nu inventa comenzi.
+- Nu inventa cifre; nu recalcula ratele.
+- "false-positive" doar când datele o susțin (de exemplu client cu comenzi plătite anterior).
+- Când semnalele sunt insuficiente, folosește "needs-review". Este un răspuns corect.
+- Clasifică fiecare comandă primită, o singură dată.
+- Nu propune publicarea vreunei modificări; decizia rămâne a omului.`,
+    },
+    {
+      role: "user",
+      content: `Perioadă: ultimele ${stats.windowDays} zile.
+Comenzi înregistrate: ${stats.checkouts} (plătite ${stats.paid}, blocate ${stats.blocked}, rată blocare ${(stats.blockRate * 100).toFixed(2)}%).
+Valoare refuzată: ${money(stats.blockedValue)}.
+Blocate ca guest: ${stats.guestBlocked}; blocate autentificat: ${stats.authenticatedBlocked}.
+Clienți blocați deși au comenzi plătite: ${stats.suspectedFalsePositives}.
+Clienți blocați de mai multe ori: ${stats.repeatBlockedCustomers}.
+Evaluări antifraudă înregistrate: ${stats.fraudEvaluations}.
+Distribuția scorurilor de risc: ${stats.scoreBuckets.map((b) => `${b.label}: ${b.count}`).join(", ")}.
+
+Blocări pe regulă:
+${ruleLines || "(nicio regulă înregistrată pe comenzile blocate)"}
+
+Comenzi blocate:
+${incidentLines}`,
+    },
+  ]);
+
+  if (!result.ok) return result;
+
+  const parsed = extractJson<Record<string, unknown>>(result.data);
+  if (!parsed) {
+    return { ok: false, error: "Modelul nu a returnat JSON valid.", call: result.call };
+  }
+
+  const allowed = new Set(stats.incidents.map((incident) => incident.orderId));
+  const seen = new Set<string>();
+  const classifications: FraudClassification[] = [];
+  const dropped: string[] = [];
+
+  const rows = Array.isArray(parsed.classifications) ? parsed.classifications : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") {
+      dropped.push("intrare care nu este un obiect");
+      continue;
+    }
+
+    const candidate = row as Record<string, unknown>;
+    const orderId =
+      typeof candidate.orderId === "string" ? candidate.orderId : null;
+
+    if (!orderId || !allowed.has(orderId)) {
+      dropped.push(`comandă inexistentă: ${orderId ?? "fără id"}`);
+      continue;
+    }
+    if (seen.has(orderId)) {
+      dropped.push(`clasificare duplicată pentru ${orderId}`);
+      continue;
+    }
+
+    const label = candidate.classification;
+    if (
+      typeof label !== "string" ||
+      !FRAUD_CLASSES.includes(label as FraudClass)
+    ) {
+      dropped.push(`etichetă necunoscută pentru ${orderId}: ${String(label)}`);
+      continue;
+    }
+
+    seen.add(orderId);
+    classifications.push({
+      orderId,
+      classification: label as FraudClass,
+      reason:
+        typeof candidate.reason === "string" && candidate.reason.trim()
+          ? candidate.reason.trim()
+          : "Fără motiv formulat.",
+    });
+  }
+
+  if (classifications.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Modelul nu a clasificat nicio comandă reală din listă. Statisticile calculate de aplicație rămân valabile.",
+      call: result.call,
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      summary: typeof parsed.summary === "string" ? parsed.summary : "",
+      recommendation:
+        typeof parsed.recommendation === "string" ? parsed.recommendation : "",
+      classifications,
+      dropped,
+    },
+    call: result.call,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +724,8 @@ export async function proposeImprovement(input: {
   rule: RuleDefinition;
   findings: RuleFinding[];
   usage: { matched: number; won: number };
+  /** Leave-one-out measurement for this rule, when history allowed one. */
+  impact: RuleImpact | null;
   schema: ContextSchema;
 }): Promise<AiResult<RuleProposal>> {
   const result = await callModel([
@@ -422,6 +736,11 @@ export async function proposeImprovement(input: {
 Păstrează aceeași "key" și aceeași "category". Poți schimba condițiile, acțiunile și prioritatea.
 Răspunde DOAR cu JSON: regula completă plus "confidence" (0-1) și "reasoning".
 
+REGULI STRICTE:
+- Folosește exclusiv câmpurile de mai jos, cu operatorii permiși pentru tipul lor.
+- Statisticile primite sunt măsurate de aplicație; nu le contrazice și nu inventa altele.
+- Dacă regula nu are niciun efect măsurat, spune în "reasoning" ce anume o făcea inutilă.
+
 CÂMPURI DISPONIBILE:
 ${describeSchemaForPrompt(input.schema, input.rule.category)}`,
     },
@@ -431,6 +750,12 @@ ${describeSchemaForPrompt(input.schema, input.rule.category)}`,
 ${JSON.stringify(input.rule, null, 2)}
 
 Statistici calculate de aplicație: ${input.usage.matched} potriviri, ${input.usage.won} câștigate.
+${
+  input.impact
+    ? `Impact măsurat prin reluarea istoricului fără această regulă:
+${impactLine(input.impact)}`
+    : "Impact nemăsurat: nu existau contexte salvate pentru reluare."
+}
 
 Probleme constatate:
 ${input.findings.map(findingLine).join("\n") || "(niciuna)"}

@@ -9,3 +9,4 @@ export * from "./describe";
 export * from "./diff";
 export * from "./analysis";
 export * from "./simulate";
+export * from "./impact";

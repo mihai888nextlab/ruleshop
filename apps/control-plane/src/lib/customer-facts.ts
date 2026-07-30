@@ -53,10 +53,16 @@ export async function buildCustomerFacts(
 ): Promise<CustomerFacts> {
   if (identity.kind === "guest") return guestFacts();
 
-  const [user, orderStats, profile] = await Promise.all([
+  const [user, membership, orderStats, profile] = await Promise.all([
     prisma.user.findUnique({
       where: { id: identity.userId },
-      select: { id: true, email: true, loyaltyPoints: true },
+      select: { id: true, email: true },
+    }),
+    prisma.membership.findUnique({
+      where: {
+        storeId_userId: { storeId, userId: identity.userId },
+      },
+      select: { loyaltyPoints: true },
     }),
     // Order history is scoped to this store: a customer's standing in one shop
     // must not leak into another's decisions.
@@ -73,18 +79,19 @@ export async function buildCustomerFacts(
     }),
   ]);
 
-  if (!user) return guestFacts();
+  if (!user || !membership) return guestFacts();
 
   const orderCount = orderStats._count._all;
   const totalSpent = Number(orderStats._sum.total ?? 0);
+  const loyaltyPoints = membership.loyaltyPoints;
 
   return {
     isGuest: false,
     verified: true,
     userId: user.id,
     email: user.email,
-    loyaltyPoints: user.loyaltyPoints,
-    tier: user.loyaltyPoints >= VIP_POINTS_THRESHOLD ? "vip" : "standard",
+    loyaltyPoints,
+    tier: loyaltyPoints >= VIP_POINTS_THRESHOLD ? "vip" : "standard",
     orderCount,
     totalSpent,
     avgOrderValue: orderCount > 0 ? totalSpent / orderCount : 0,

@@ -25,7 +25,7 @@ export function DecisionPanel({
 }: DecisionPanelProps) {
   return (
     <aside
-      className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
+      className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
       aria-label={title}
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">

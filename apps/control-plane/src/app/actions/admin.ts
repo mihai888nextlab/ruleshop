@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireStoreRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import { saveProductImage } from "@/lib/product-image-upload";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 
@@ -12,38 +13,60 @@ async function storeOrThrow(slug: string) {
   return store;
 }
 
-export async function upsertProduct(
-  slug: string,
-  data: {
-    id?: string;
-    name: string;
-    productSlug: string;
-    description: string;
-    category: string;
-    basePrice: number;
-    stock: number;
-    active: boolean;
-  },
-) {
+function requiredString(formData: FormData, key: string): string {
+  const value = String(formData.get(key) ?? "").trim();
+  if (!value) throw new Error(`Câmpul „${key}” este obligatoriu`);
+  return value;
+}
+
+export async function upsertProduct(slug: string, formData: FormData) {
   const store = await storeOrThrow(slug);
   const authz = await requireStoreRole(store.id, "OPERATOR");
   if (!authz.ok) throw new Error(authz.error);
 
-  if (data.id) {
+  const id = String(formData.get("id") ?? "").trim() || undefined;
+  const name = requiredString(formData, "name");
+  const productSlug = requiredString(formData, "productSlug");
+  const description = String(formData.get("description") ?? "").trim();
+  const category = requiredString(formData, "category");
+  const basePrice = Number(formData.get("basePrice"));
+  const stock = Number(formData.get("stock"));
+  const active = formData.get("active") === "on";
+
+  if (!Number.isFinite(basePrice) || basePrice < 0) {
+    throw new Error("Preț invalid");
+  }
+  if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
+    throw new Error("Stoc invalid");
+  }
+
+  const image = formData.get("image");
+  const clearImage = formData.get("clearImage") === "on";
+
+  let imageUrl: string | null | undefined;
+  if (image instanceof File && image.size > 0) {
+    imageUrl = await saveProductImage(slug, image);
+  } else if (clearImage) {
+    imageUrl = null;
+  }
+
+  if (id) {
     const existing = await prisma.product.findFirst({
-      where: { id: data.id, storeId: store.id },
+      where: { id, storeId: store.id },
     });
     if (!existing) throw new Error("Produs inexistent");
+
     await prisma.product.update({
-      where: { id: data.id },
+      where: { id },
       data: {
-        name: data.name,
-        slug: data.productSlug,
-        description: data.description,
-        category: data.category,
-        basePrice: data.basePrice,
-        stock: data.stock,
-        active: data.active,
+        name,
+        slug: productSlug,
+        description,
+        category,
+        basePrice,
+        stock,
+        active,
+        ...(imageUrl !== undefined ? { imageUrl } : {}),
       },
     });
     await writeAudit({
@@ -51,19 +74,20 @@ export async function upsertProduct(
       userId: authz.session.user.id,
       action: "product.updated",
       entity: "Product",
-      entityId: data.id,
+      entityId: id,
     });
   } else {
     const created = await prisma.product.create({
       data: {
         storeId: store.id,
-        name: data.name,
-        slug: data.productSlug,
-        description: data.description,
-        category: data.category,
-        basePrice: data.basePrice,
-        stock: data.stock,
-        active: data.active,
+        name,
+        slug: productSlug,
+        description,
+        category,
+        basePrice,
+        stock,
+        active,
+        imageUrl: imageUrl ?? null,
       },
     });
     await writeAudit({
@@ -74,6 +98,7 @@ export async function upsertProduct(
       entityId: created.id,
     });
   }
+
   revalidatePath(`/s/${slug}/admin/products`);
   revalidatePath(`/s/${slug}`);
 }

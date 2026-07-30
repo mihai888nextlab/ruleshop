@@ -6,7 +6,7 @@ Platformă web multi-tenant: magazine online + control plane pentru un **rule en
 
 - Node.js 20+
 - Docker (PostgreSQL)
-- Opțional: `MOONSHOT_API_KEY` pentru modulul AI (Kimi)
+- Opțional: `GEMINI_API_KEY` pentru modulul AI (Google Gemini)
 
 ## Pornire rapidă
 
@@ -55,13 +55,16 @@ Deschide [http://localhost:3000](http://localhost:3000).
 
 ## Documentație
 
-Vezi [ARCHITECTURE.md](./ARCHITECTURE.md) pentru modelul regulilor, conflicte, canary și multi-tenancy.
+- **[Storefront API](http://localhost:3001/docs)** — live docs on the control plane (`/docs`)
+- [docs/storefront-api.md](./docs/storefront-api.md) — same content in the repo
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — modelul regulilor, conflicte, canary și multi-tenancy
 
 ## Variabile de mediu
 
-Vezi `.env.example`:
+Vezi `.env.example` (root) și `apps/control-plane/.env.example` / `apps/storefront/.env.example`:
 
 - `DATABASE_URL`
-- `AUTH_SECRET`
-- `MOONSHOT_API_KEY` / `MOONSHOT_MODEL`
-- `NEXTAUTH_URL`
+- `AUTH_SECRET` / `STOREFRONT_JWT_SECRET`
+- `STOREFRONT_ORIGIN` / `CONTROL_PLANE_PUBLIC_URL`
+- `VITE_RULESHOP_API_URL` / `VITE_RULESHOP_API_KEY` (storefront)
+- `GEMINI_API_KEY` / `GEMINI_MODEL`

@@ -1,46 +1,56 @@
-"use client";
+import { useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { checkout } from "@/lib/api";
+import { money } from "@/components/decision-note";
+import type { ShippingOption } from "@/lib/types";
+import { useRuleShop } from "@/sdk/RuleShopProvider";
 
-import { useActionState, useId, useMemo } from "react";
-import type { ShippingOption } from "@ruleshop/contracts";
-import type { ActionState } from "@/app/actions";
-
-/**
- * Checkout form.
- *
- * The idempotency token is minted once when the form mounts and submitted with
- * it, so a double-click, an impatient reload of the POST, or a retry after a
- * timeout all carry the same token and the control plane returns the original
- * order instead of placing a second one.
- */
 export function CheckoutForm({
-  action,
   shippingOptions,
   requiresEmail,
-  formatMoney,
 }: {
-  action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   shippingOptions: ShippingOption[];
   requiresEmail: boolean;
-  formatMoney: (value: number) => string;
 }) {
-  const [state, formAction, pending] = useActionState(action, null);
-  const emailId = useId();
-
-  // Stable for the lifetime of this form instance, which is exactly the scope a
-  // single checkout attempt should share.
+  const navigate = useNavigate();
+  const { refreshCart } = useRuleShop();
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
 
-  // Preselect the cheapest option. Seeded as undefined rather than element 0,
-  // which need not exist.
   const cheapest = shippingOptions.reduce<ShippingOption | undefined>(
     (best, option) => (!best || option.cost < best.cost ? option : best),
     undefined,
   );
 
-  return (
-    <form action={formAction} className="flex flex-col gap-6">
-      <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    const form = new FormData(event.currentTarget);
+    const shippingMethod = String(form.get("shippingMethod") ?? "");
+    const guestEmail = form.get("guestEmail")
+      ? String(form.get("guestEmail"))
+      : undefined;
 
+    const result = await checkout({
+      shippingMethod,
+      guestEmail,
+      idempotencyKey,
+    });
+    setPending(false);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    await refreshCart();
+    navigate(`/orders/${result.data.order.id}`);
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm font-medium uppercase tracking-wide text-[var(--muted)]">
           Metodă de livrare
@@ -63,7 +73,7 @@ export function CheckoutForm({
             />
             <span className="flex-1">{option.label ?? option.method}</span>
             <span>
-              {option.cost === 0 ? "gratuit" : formatMoney(option.cost)}
+              {option.cost === 0 ? "gratuit" : money(option.cost)}
             </span>
           </label>
         ))}
@@ -71,45 +81,32 @@ export function CheckoutForm({
 
       {requiresEmail && (
         <div className="flex flex-col gap-1">
-          <label htmlFor={emailId} className="text-sm">
+          <label htmlFor="guestEmail" className="text-sm">
             Email pentru confirmare
           </label>
           <input
-            id={emailId}
+            id="guestEmail"
             name="guestEmail"
             type="email"
             required
-            autoComplete="email"
-            className="border-b border-[var(--border)] bg-transparent py-1.5 outline-none focus:border-[var(--accent)]"
+            placeholder="tu@exemplu.ro"
+            className="field"
           />
-          <p className="text-xs text-[var(--muted)]">
-            Cumperi ca oaspete. Vei avea nevoie de acest email pentru a revedea
-            comanda mai târziu.
-          </p>
         </div>
       )}
 
-      {state?.error && (
+      {error && (
         <p
           role="alert"
           className="border border-[var(--danger)] px-3 py-2 text-sm text-[var(--danger)]"
         >
-          {state.error}
+          {error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="border border-[var(--accent)] bg-[var(--accent)] px-4 py-3 text-sm text-[var(--accent-fg)] disabled:opacity-60"
-      >
-        {pending ? "Se procesează…" : "Plasează comanda"}
+      <button type="submit" disabled={pending} className="btn disabled:opacity-60">
+        {pending ? "Se plasează…" : "Plasează comanda"}
       </button>
-
-      <p className="text-xs text-[var(--muted)]">
-        Plata este simulată. Comanda este înregistrată și poate fi consultată
-        ulterior.
-      </p>
     </form>
   );
 }

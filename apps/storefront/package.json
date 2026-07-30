@@ -2,32 +2,27 @@
   "name": "@ruleshop/storefront",
   "version": "0.1.0",
   "private": true,
-  "description": "Customer-facing shops. Talks to the control plane over HTTP only: no database driver, no direct rule evaluation.",
+  "type": "module",
+  "description": "Blank Vite storefront bound to one store via RuleShop API key. Static hosting only — talks to the control plane over HTTP.",
   "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
-    "start": "next start --port 3000",
-    "lint": "eslint",
+    "dev": "vite --port 3000",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 3000",
+    "start": "vite preview --port 3000",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ruleshop/contracts": "*",
-    "clsx": "^2.1.1",
-    "lucide-react": "^1.27.0",
-    "next": "16.2.12",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "tailwind-merge": "^3.6.0",
-    "zod": "^4.4.3"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.9.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.12",
+    "@vitejs/plugin-react": "^4.7.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^6.3.5"
   }
 }

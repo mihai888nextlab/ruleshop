@@ -26,7 +26,7 @@ export async function GET(
     const store = await findStoreBySlug(slug);
     if (!store) return apiError("Magazin inexistent", 404);
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     const email = new URL(request.url).searchParams
       .get("email")
       ?.trim()

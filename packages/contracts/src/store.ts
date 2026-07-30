@@ -22,3 +22,22 @@ export const apiErrorSchema = z.object({
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+/**
+ * SPA bootstrap: store identity + theme tokens from the engine.
+ * Theme shape mirrors resolvedThemeSchema without importing theme.ts (avoids
+ * a circular contracts load when index re-exports both modules).
+ */
+export const bootstrapResponseSchema = z.object({
+  storeId: z.string(),
+  storeName: z.string(),
+  slug: z.string(),
+  theme: z.object({
+    key: z.string().nullable(),
+    name: z.string(),
+    tokens: z.record(z.string(), z.unknown()),
+    fallback: z.boolean(),
+  }),
+});
+
+export type BootstrapResponse = z.infer<typeof bootstrapResponseSchema>;

@@ -1,13 +1,4 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { PageHeader } from "@/components/dashboard/shell";
-import { requireStoreRole } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import {
-  getStoreBySlug,
-  parseNumberArray,
-  parseStringArray,
-} from "@/lib/store";
 import {
   createDraftRuleset,
   publishRuleset,
@@ -17,9 +8,18 @@ import {
   setRuleKilled,
   setVersionKilled,
 } from "@/app/actions/rules";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/dashboard/shell";
+import { RulesetList } from "@/components/lists/ruleset-list";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { requireStoreRole } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import {
+  getStoreBySlug,
+  parseNumberArray,
+  parseStringArray,
+} from "@/lib/store";
 
 export default async function RulesHomePage({
   params,
@@ -42,8 +42,6 @@ export default async function RulesHomePage({
   const killedRuleKeys = parseStringArray(store.killedRuleKeys);
   const killedVersions = parseNumberArray(store.killedVersions);
 
-  // The rules an individual kill switch can act on are the ones currently being
-  // served, which is the stable version.
   const liveRuleset =
     dep?.stableVersion != null
       ? await prisma.ruleset.findUnique({
@@ -60,13 +58,7 @@ export default async function RulesHomePage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        eyebrow="Lifecycle"
         title="Reguli"
-        description={`Stable v${dep?.stableVersion ?? "—"} · Canary ${
-          dep?.canaryVersion != null
-            ? `v${dep.canaryVersion} (${dep.canaryPercent}%)`
-            : "off"
-        }`}
         actions={
           <form
             action={async () => {
@@ -84,10 +76,7 @@ export default async function RulesHomePage({
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="panel p-5">
-          <h2 className="display text-xl">Canary</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Direcționează un procent din trafic către o versiune experimentală.
-          </p>
+          <h2 className="text-xl font-semibold tracking-tight">Canary</h2>
           <form
             className="mt-4 flex gap-2"
             action={async (fd) => {
@@ -103,16 +92,13 @@ export default async function RulesHomePage({
               defaultValue={dep?.canaryPercent ?? 0}
             />
             <Button type="submit" variant="outline">
-              Setează %
+              %
             </Button>
           </form>
         </div>
 
         <div className="panel p-5">
-          <h2 className="display text-xl">Kill switch</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Oprește imediat categoriile de reguli fără un rollback complet.
-          </p>
+          <h2 className="text-xl font-semibold tracking-tight">Kill switch</h2>
           <form
             className="mt-4"
             action={async () => {
@@ -168,14 +154,9 @@ export default async function RulesHomePage({
 
       {liveRules.length > 0 && (
         <section>
-          <h2 className="eyebrow mb-3">
-            Reguli active în v{dep?.stableVersion} — kill individual
+          <h2 className="mb-3 text-xl font-semibold tracking-tight">
+            Reguli active în v{dep?.stableVersion}
           </h2>
-          <p className="mb-3 text-sm text-[var(--muted)]">
-            Scoate din funcțiune o singură regulă, imediat și fără a modifica
-            versiunea publicată. Restul regulilor continuă să se aplice, iar
-            urma evaluării va arăta că regula a fost oprită.
-          </p>
           <ul className="flex flex-col gap-2">
             {liveRules.map((rule) => {
               const killed = killedRuleKeys.includes(rule.key);
@@ -220,111 +201,34 @@ export default async function RulesHomePage({
       )}
 
       <section>
-        <h2 className="eyebrow mb-3">Versiuni</h2>
-        <ul className="flex flex-col gap-3">
-          {rulesets.map((rs) => (
-            <li key={rs.id} className="panel flex flex-wrap items-center justify-between gap-3 p-4">
-              <div>
-                <Link
-                  href={`/s/${slug}/rules/${rs.version}`}
-                  className="display text-xl hover:underline"
-                >
-                  Versiunea {rs.version}
-                </Link>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Badge
-                    tone={
-                      rs.status === "published"
-                        ? "ok"
-                        : rs.status === "canary"
-                          ? "warn"
-                          : "muted"
-                    }
-                  >
-                    {rs.status}
-                  </Badge>
-                  <Badge tone="muted">{rs._count.rules} reguli</Badge>
-                  {killedVersions.includes(rs.version) && (
-                    <Badge tone="warn">oprită prin kill switch</Badge>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {/* Killing a version refuses it at resolution time, without
-                    editing it — published versions stay immutable so they remain
-                    auditable and restorable. */}
-                <form
-                  action={async () => {
-                    "use server";
-                    await setVersionKilled(
-                      slug,
-                      rs.version,
-                      !killedVersions.includes(rs.version),
-                    );
-                  }}
-                >
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant={
-                      killedVersions.includes(rs.version) ? "danger" : "ghost"
-                    }
-                    title={
-                      killedVersions.includes(rs.version)
-                        ? "Reia servirea acestei versiuni"
-                        : "Oprește imediat servirea acestei versiuni"
-                    }
-                  >
-                    {killedVersions.includes(rs.version) ? "Reactivează" : "Kill"}
-                  </Button>
-                </form>
-                <Link
-                  href={`/s/${slug}/rules/diff?a=${rs.version}&b=${dep?.stableVersion ?? rs.version}`}
-                >
-                  <Button variant="ghost" size="sm">
-                    Diff
-                  </Button>
-                </Link>
-                {rs.status === "draft" && (
-                  <>
-                    <form
-                      action={async () => {
-                        "use server";
-                        await publishRuleset(slug, rs.version, "stable");
-                      }}
-                    >
-                      <Button type="submit" size="sm">
-                        Publică stable
-                      </Button>
-                    </form>
-                    <form
-                      action={async () => {
-                        "use server";
-                        await publishRuleset(slug, rs.version, "canary", 20);
-                      }}
-                    >
-                      <Button type="submit" size="sm" variant="outline">
-                        Canary 20%
-                      </Button>
-                    </form>
-                  </>
-                )}
-                {rs.status !== "draft" && dep?.stableVersion !== rs.version && (
-                  <form
-                    action={async () => {
-                      "use server";
-                      await rollbackToVersion(slug, rs.version);
-                    }}
-                  >
-                    <Button type="submit" size="sm" variant="secondary">
-                      Rollback aici
-                    </Button>
-                  </form>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <h2 className="mb-3 text-xl font-semibold tracking-tight">Versiuni</h2>
+        <RulesetList
+          slug={slug}
+          stableVersion={dep?.stableVersion ?? null}
+          rulesets={rulesets.map((rs) => ({
+            id: rs.id,
+            version: rs.version,
+            status: rs.status,
+            ruleCount: rs._count.rules,
+            killed: killedVersions.includes(rs.version),
+          }))}
+          onPublishStable={async (version) => {
+            "use server";
+            await publishRuleset(slug, version, "stable");
+          }}
+          onPublishCanary={async (version) => {
+            "use server";
+            await publishRuleset(slug, version, "canary", 20);
+          }}
+          onRollback={async (version) => {
+            "use server";
+            await rollbackToVersion(slug, version);
+          }}
+          onToggleKill={async (version, killed) => {
+            "use server";
+            await setVersionKilled(slug, version, killed);
+          }}
+        />
       </section>
     </div>
   );

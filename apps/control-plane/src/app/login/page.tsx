@@ -34,27 +34,39 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full max-w-md flex-col gap-4">
-      <h1 className="display text-3xl">Autentificare</h1>
-      <p className="text-sm text-[var(--muted)]">
+    <form
+      onSubmit={onSubmit}
+      className="w-full max-w-sm border border-[var(--border)] bg-[var(--surface)] p-6"
+    >
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Autentificare
+      </h1>
+      <p className="mt-2 text-xs text-[var(--muted)]">
         Demo: vip@demo.local / demo123 · admin@fashion.local / admin123
       </p>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="mt-5 flex flex-col gap-1 text-sm">
         Email
         <Input name="email" type="email" required defaultValue="vip@demo.local" />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="mt-3 flex flex-col gap-1 text-sm">
         Parolă
-        <Input name="password" type="password" required defaultValue="demo123" />
+        <Input
+          name="password"
+          type="password"
+          required
+          defaultValue="demo123"
+        />
       </label>
-      {error && <p className="text-sm text-red-700">{error}</p>}
-      <Button type="submit" disabled={loading}>
+      {error && (
+        <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>
+      )}
+      <Button type="submit" disabled={loading} className="mt-5 w-full">
         {loading ? "Se conectează…" : "Intră"}
       </Button>
-      <p className="text-sm text-[var(--muted)]">
-        Nu ai cont?{" "}
-        <Link href="/register" className="text-[var(--accent)] underline">
-          Înregistrare
+      <p className="mt-4 text-sm text-[var(--muted)]">
+        Vrei un magazin?{" "}
+        <Link href="/register" className="underline">
+          Deschide un magazin
         </Link>
       </p>
     </form>
@@ -63,7 +75,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="mesh flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
       <Suspense>
         <LoginForm />
       </Suspense>

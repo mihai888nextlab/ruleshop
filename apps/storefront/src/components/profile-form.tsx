@@ -1,26 +1,16 @@
-"use client";
+import { useState, type FormEvent } from "react";
+import { saveProfile } from "@/lib/api";
+import type { ProfileField } from "@/lib/types";
 
-import { useActionState } from "react";
-import type { ProfileField } from "@ruleshop/contracts";
-import type { ActionState } from "@/app/actions";
-
-/**
- * Renders a form for a schema the storefront learns at request time.
- *
- * Nothing here knows what fields this store has. The control plane describes
- * them — key, label, type, options — and the input rendered follows the declared
- * type, which is the same type that decides which operators a rule may use
- * against the value. An administrator adding an attribute therefore needs no
- * storefront deploy.
- */
 export function ProfileForm({
-  action,
-  fields,
+  fields: initialFields,
 }: {
-  action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   fields: ProfileField[];
 }) {
-  const [state, formAction, pending] = useActionState(action, null);
+  const [fields, setFields] = useState(initialFields);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   if (fields.length === 0) {
     return (
@@ -30,34 +20,67 @@ export function ProfileForm({
     );
   }
 
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    const form = new FormData(event.currentTarget);
+    const values: Record<string, unknown> = {};
+    for (const field of fields) {
+      const raw = form.get(`attr:${field.key}`);
+      if (field.type === "boolean") {
+        values[field.key] = form.get(`attr:${field.key}`) === "on";
+      } else if (raw !== null && String(raw).length > 0) {
+        values[field.key] = String(raw);
+      } else {
+        values[field.key] = null;
+      }
+    }
+
+    const result = await saveProfile(values);
+    setPending(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setFields(result.data.fields);
+    if (!result.data.ok) {
+      const first = Object.values(result.data.errors)[0];
+      setError(first ?? "Date invalide");
+      return;
+    }
+    setNotice("Profilul a fost salvat.");
+  }
+
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
       {fields.map((field) => (
         <FieldInput key={field.key} field={field} />
       ))}
 
-      {state?.error && (
+      {error && (
         <p
           role="alert"
           className="border border-[var(--danger)] px-3 py-2 text-sm text-[var(--danger)]"
         >
-          {state.error}
+          {error}
         </p>
       )}
 
-      {state?.notice && (
+      {notice && (
         <p
           role="status"
           className="border-l-2 border-[var(--positive)] bg-[var(--surface-2)] px-3 py-2 text-sm"
         >
-          {state.notice}
+          {notice}
         </p>
       )}
 
       <button
         type="submit"
         disabled={pending}
-        className="self-start border border-[var(--accent)] bg-[var(--accent)] px-4 py-2.5 text-sm text-[var(--accent-fg)] disabled:opacity-60"
+        className="btn self-start disabled:opacity-60"
       >
         {pending ? "Se salvează…" : "Salvează profilul"}
       </button>
@@ -66,12 +89,7 @@ export function ProfileForm({
 }
 
 function FieldInput({ field }: { field: ProfileField }) {
-  // Prefixed so the server action can tell attribute values apart from any other
-  // form field without needing to know the store's schema.
   const name = `attr:${field.key}`;
-  const inputClass =
-    "border-b border-[var(--border)] bg-transparent py-1.5 outline-none focus:border-[var(--accent)]";
-
   const label = (
     <span className="flex flex-wrap items-baseline gap-2">
       <span>{field.label}</span>
@@ -81,96 +99,60 @@ function FieldInput({ field }: { field: ProfileField }) {
     </span>
   );
 
-  const description = field.description ? (
-    <span className="text-xs text-[var(--muted)]">{field.description}</span>
-  ) : null;
-
-  switch (field.type) {
-    case "boolean":
-      return (
-        <label className="flex items-start gap-3 text-sm">
-          <input
-            name={name}
-            type="checkbox"
-            value="on"
-            defaultChecked={field.value === true}
-            className="mt-1"
-          />
-          <span className="flex flex-col gap-0.5">
-            {label}
-            {description}
-          </span>
-        </label>
-      );
-
-    case "enum":
-      return (
-        <label className="flex flex-col gap-1 text-sm">
-          {label}
-          <select
-            name={name}
-            required={field.required}
-            defaultValue={typeof field.value === "string" ? field.value : ""}
-            className={inputClass}
-          >
-            <option value="">— nespecificat —</option>
-            {field.options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-          {description}
-        </label>
-      );
-
-    case "date":
-      return (
-        <label className="flex flex-col gap-1 text-sm">
-          {label}
-          <input
-            name={name}
-            type="date"
-            required={field.required}
-            defaultValue={
-              typeof field.value === "string" ? field.value.slice(0, 10) : ""
-            }
-            className={inputClass}
-          />
-          {description}
-        </label>
-      );
-
-    case "number":
-      return (
-        <label className="flex flex-col gap-1 text-sm">
-          {label}
-          <input
-            name={name}
-            type="number"
-            step="any"
-            required={field.required}
-            defaultValue={
-              typeof field.value === "number" ? String(field.value) : ""
-            }
-            className={inputClass}
-          />
-          {description}
-        </label>
-      );
-
-    case "string":
-      return (
-        <label className="flex flex-col gap-1 text-sm">
-          {label}
-          <input
-            name={name}
-            required={field.required}
-            defaultValue={typeof field.value === "string" ? field.value : ""}
-            className={inputClass}
-          />
-          {description}
-        </label>
-      );
+  if (field.type === "boolean") {
+    return (
+      <label className="flex items-center gap-3 text-sm">
+        <input
+          type="checkbox"
+          name={name}
+          defaultChecked={Boolean(field.value)}
+        />
+        {label}
+      </label>
+    );
   }
+
+  if (field.type === "enum" && field.options.length > 0) {
+    return (
+      <label className="flex flex-col gap-1 text-sm">
+        {label}
+        <select
+          name={name}
+          defaultValue={field.value == null ? "" : String(field.value)}
+          className="field"
+          required={field.required}
+        >
+          <option value="">—</option>
+          {field.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
+  const inputType =
+    field.type === "number"
+      ? "number"
+      : field.type === "date"
+        ? "date"
+        : "text";
+
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      {label}
+      {field.description && (
+        <span className="text-xs text-[var(--muted)]">{field.description}</span>
+      )}
+      <input
+        name={name}
+        type={inputType}
+        defaultValue={field.value == null ? "" : String(field.value)}
+        required={field.required}
+        className="field"
+      />
+    </label>
+  );
 }

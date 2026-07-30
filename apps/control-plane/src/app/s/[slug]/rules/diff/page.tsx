@@ -7,6 +7,9 @@ import {
   type FieldChange,
   type RuleDiff,
 } from "@ruleshop/engine";
+import { explainVersionDiff } from "@/app/actions/ai";
+import { ExplainDiffButton } from "@/components/ai/explain-diff-button";
+import { isAiConfigured } from "@/lib/ai";
 import { requireStoreRole } from "@/lib/auth";
 import { loadContextSchema } from "@/lib/context-schema";
 import { toRuleDefs } from "@/lib/decide";
@@ -85,13 +88,31 @@ export default async function DiffPage({
   const unchanged = diffs.filter((d) => d.kind === "unchanged");
   const behavioural = changed.filter(hasBehaviouralChange).length;
 
+  // The most recent explanation for exactly this pair, if one was ever asked for.
+  // Keyed on the prompt this application wrote, so it cannot match a different
+  // comparison.
+  const explanation = await prisma.aiSuggestion.findFirst({
+    where: {
+      storeId: store.id,
+      kind: "diff_explanation",
+      prompt: `diff:v${aVersion}->v${bVersion}`,
+    },
+    orderBy: { createdAt: "desc" },
+    select: { proposal: true, createdAt: true, model: true },
+  });
+
+  const explanationText = (() => {
+    const proposal = (explanation?.proposal ?? {}) as { explanation?: unknown };
+    return typeof proposal.explanation === "string" ? proposal.explanation : null;
+  })();
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
           ← Control plane
         </Link>
-        <h1 className="display text-3xl">
+        <h1 className="font-semibold tracking-tight text-3xl">
           Diferențe v{aVersion} → v{bVersion}
         </h1>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -111,7 +132,7 @@ export default async function DiffPage({
         </div>
       </div>
 
-      <form className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+      <form className="flex flex-wrap items-end gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
         <VersionPicker
           name="a"
           label="De la"
@@ -129,10 +150,33 @@ export default async function DiffPage({
         <Button type="submit" size="sm">
           Compară
         </Button>
+        <ExplainDiffButton
+          onExplain={explainVersionDiff.bind(null, slug, aVersion, bVersion)}
+          disabled={!isAiConfigured() || summary.identical}
+          disabledReason={
+            summary.identical
+              ? "Versiunile sunt identice; nu este nimic de explicat."
+              : "Modulul AI nu este configurat (GEMINI_API_KEY lipsește)."
+          }
+        />
       </form>
 
+      {explanationText && (
+        <section className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface)] p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide">
+            Explicație generată de model
+          </h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm">{explanationText}</p>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            Generată din diferențele calculate mai jos, care rămân sursa de
+            adevăr. {explanation?.model ?? "model necunoscut"} ·{" "}
+            {explanation?.createdAt.toLocaleString("ro-RO")}
+          </p>
+        </section>
+      )}
+
       {summary.identical ? (
-        <p className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">
+        <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">
           Cele două versiuni sunt identice în privința regulilor.
         </p>
       ) : (
@@ -144,7 +188,7 @@ export default async function DiffPage({
       )}
 
       {unchanged.length > 0 && (
-        <details className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+        <details className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
           <summary className="cursor-pointer text-sm text-[var(--muted)]">
             {unchanged.length}{" "}
             {unchanged.length === 1 ? "regulă neschimbată" : "reguli neschimbate"}
@@ -192,7 +236,7 @@ function VersionPicker({
       <select
         name={name}
         defaultValue={value}
-        className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+        className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
       >
         {versions.map((version) => (
           <option key={version.version} value={version.version}>
@@ -224,7 +268,7 @@ function DiffCard({ diff }: { diff: RuleDiff }) {
 
   return (
     <li
-      className={`rounded-lg border border-[var(--border)] border-l-4 bg-[var(--surface)] p-4 ${accent}`}
+      className={`rounded-[var(--radius)] border border-[var(--border)] border-l-4 bg-[var(--surface)] p-4 ${accent}`}
     >
       <div className="flex flex-wrap items-baseline gap-2">
         <p className="font-medium">{diff.key}</p>

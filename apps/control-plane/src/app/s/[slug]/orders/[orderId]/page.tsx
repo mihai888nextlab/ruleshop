@@ -5,6 +5,7 @@ import { getStoreBySlug } from "@/lib/store";
 import { formatRon } from "@/lib/utils";
 import { DecisionPanel } from "@/components/decision-panel";
 import { Badge } from "@/components/ui/badge";
+import { StorefrontChrome } from "@/components/storefront-chrome";
 
 export default async function OrderDetailPage({
   params,
@@ -59,15 +60,16 @@ export default async function OrderDetailPage({
   } | null;
 
   return (
+    <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="flex flex-col gap-6">
       <div>
         <Badge tone="ok">{order.status}</Badge>
-        <h1 className="display mt-2 text-3xl">Comandă plasată</h1>
+        <h1 className="font-semibold tracking-tight mt-2 text-3xl">Comandă plasată</h1>
         <p className="text-sm text-[var(--muted)]">
           {order.createdAt.toLocaleString("ro-RO")} · ID {order.id}
         </p>
       </div>
-      <ul className="flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+      <ul className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
         {order.items.map((i) => (
           <li key={i.id} className="flex justify-between text-sm">
             <span>
@@ -112,5 +114,6 @@ export default async function OrderDetailPage({
         />
       )}
     </div>
+    </StorefrontChrome>
   );
 }

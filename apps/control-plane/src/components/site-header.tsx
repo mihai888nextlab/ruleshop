@@ -26,10 +26,10 @@ export async function SiteHeader({
   }
 
   return (
-    <header className="border-b border-[var(--border)] bg-[var(--surface)]/90 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--surface)]">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5">
         <div className="flex items-center gap-6">
-          <Link href="/" className="display text-xl font-semibold tracking-tight">
+          <Link href="/" className="text-[15px] font-semibold tracking-tight">
             RuleShop
           </Link>
           {store && (
@@ -52,14 +52,14 @@ export async function SiteHeader({
               {isStaff && (
                 <>
                   <Link
-                    href={`/s/${store.slug}/admin/products`}
-                    className="hover:text-[var(--fg)]"
+                    href={`/s/${store.slug}/admin`}
+                    className="font-medium text-[var(--accent)]"
                   >
-                    Admin
+                    Dashboard
                   </Link>
                   <Link
                     href={`/s/${store.slug}/rules`}
-                    className="font-medium text-[var(--accent)]"
+                    className="hover:text-[var(--fg)]"
                   >
                     Reguli
                   </Link>
@@ -69,6 +69,11 @@ export async function SiteHeader({
           )}
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <Link href="/docs">
+            <Button variant="ghost" size="sm">
+              Docs
+            </Button>
+          </Link>
           {session?.user ? (
             <>
               <span className="hidden text-[var(--muted)] sm:inline">

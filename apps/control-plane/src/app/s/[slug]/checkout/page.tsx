@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { cartSubtotal, getCartForStore } from "@/lib/cart";
-import { customerContext } from "@/lib/customer";
+import { customerContext, storeLoyaltyPoints } from "@/lib/customer";
 import { runDecision } from "@/lib/decide";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateGuestId, getStoreBySlug } from "@/lib/store";
@@ -10,6 +10,7 @@ import { formatRon } from "@/lib/utils";
 import { placeOrder } from "@/app/actions/checkout";
 import { DecisionPanel } from "@/components/decision-panel";
 import { CheckoutForm } from "@/components/checkout-form";
+import { StorefrontChrome } from "@/components/storefront-chrome";
 
 export default async function CheckoutPage({
   params,
@@ -37,13 +38,7 @@ export default async function CheckoutPage({
   const subjectKey = session?.user?.id
     ? `user:${session.user.id}`
     : `guest:${guestId}`;
-  let loyaltyPoints = 0;
-  if (session?.user?.id) {
-    loyaltyPoints =
-      (
-        await prisma.user.findUnique({ where: { id: session.user.id } })
-      )?.loyaltyPoints ?? 0;
-  }
+  const loyaltyPoints = await storeLoyaltyPoints(store.id, session?.user?.id);
   const customer = customerContext(session, loyaltyPoints);
 
   // Approximate priced subtotal
@@ -123,9 +118,10 @@ export default async function CheckoutPage({
   });
 
   return (
+    <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="grid gap-8 lg:grid-cols-2">
       <div className="flex flex-col gap-4">
-        <h1 className="display text-3xl">Checkout</h1>
+        <h1 className="font-semibold tracking-tight text-3xl">Checkout</h1>
         <p className="text-sm text-[var(--muted)]">
           Subtotal estimat: {formatRon(pricedSubtotal)} (față de baza{" "}
           {formatRon(cartSubtotal(cart.items))})
@@ -137,7 +133,7 @@ export default async function CheckoutPage({
           placeOrder={placeOrder}
         />
         {fraudPreview.decision.blocked === true && (
-          <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">
+          <p className="rounded-[var(--radius)] bg-red-50 p-3 text-sm text-red-800">
             Atenție: antifraudă ar bloca această comandă —{" "}
             {String(fraudPreview.decision.blockReason)}
           </p>
@@ -167,5 +163,6 @@ export default async function CheckoutPage({
         />
       </div>
     </div>
+    </StorefrontChrome>
   );
 }

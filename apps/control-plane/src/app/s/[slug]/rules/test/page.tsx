@@ -49,7 +49,7 @@ export default async function TestHarnessPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="display text-3xl">Test harness</h1>
+      <h1 className="font-semibold tracking-tight text-3xl">Test harness</h1>
       <p className="text-sm text-[var(--muted)]">
         Evaluează o versiune de reguli pe un context JSON fără a afecta
         storefront-ul (subiect test:).

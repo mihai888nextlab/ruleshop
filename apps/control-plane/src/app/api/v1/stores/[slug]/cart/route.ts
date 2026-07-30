@@ -46,7 +46,7 @@ async function loadCart(request: Request, slug: string): Promise<LoadedCart> {
     return { ok: false, response: apiError("Magazin inexistent", 404) };
   }
 
-  const identity = await resolveApiIdentity(request);
+  const identity = await resolveApiIdentity(request, store.id);
   // A signed-in customer may still be carrying the guest id they shopped under,
   // which is what lets the two carts be merged.
   const guestIdHint = request.headers.get("x-guest-id");

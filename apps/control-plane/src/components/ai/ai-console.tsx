@@ -30,6 +30,8 @@ export interface AiConsoleActions {
   improve: (ruleKey: string) => Promise<unknown>;
   explainDiff: (from: number, to: number) => Promise<unknown>;
   simulate: (id: string) => Promise<unknown>;
+  simulateVersion: (version: number) => Promise<unknown>;
+  triageFraud: () => Promise<unknown>;
   review: (
     id: string,
     decision: "approved" | "rejected",
@@ -62,6 +64,9 @@ export function AiConsole({
     liveVersion ?? versions.at(-1) ?? 1,
   );
   const [diffTo, setDiffTo] = useState(versions[0] ?? 1);
+  const [candidateVersion, setCandidateVersion] = useState(
+    versions.find((version) => version !== liveVersion) ?? versions[0] ?? 1,
+  );
 
   function run(fn: () => Promise<unknown>) {
     setError("");
@@ -75,13 +80,13 @@ export function AiConsole({
   }
 
   const selectClass =
-    "rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm";
+    "rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm";
 
   return (
     <div className="flex flex-col gap-6">
       {!aiConfigured && (
         <p className="panel border-l-4 border-l-amber-500 p-4 text-sm">
-          <strong>MOONSHOT_API_KEY nu este configurat.</strong> Analiza
+          <strong>GEMINI_API_KEY nu este configurat.</strong> Analiza
           statistică, detectarea regulilor redundante și simularea pe istoric
           funcționează în continuare — sunt calculate de aplicație. Doar
           explicațiile în limbaj natural și generarea de reguli din text au nevoie
@@ -181,7 +186,7 @@ export function AiConsole({
               rows={3}
               maxLength={1000}
               placeholder="ex. clienții din Cluj abonați la newsletter primesc 15% la paltoane"
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
             />
           </label>
           <div className="flex flex-wrap items-end gap-2">
@@ -209,6 +214,69 @@ export function AiConsole({
               Propune regula
             </Button>
           </div>
+        </section>
+
+        <section className="panel flex flex-col gap-3 p-4">
+          <div>
+            <h2 className="font-medium">Simulează o versiune candidat</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Reia evaluările reale prin regulile unei versiuni nepublicate și
+              compară metricile cu versiunea live. Calculat de aplicație —
+              funcționează și fără cheie de API.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1 text-sm">
+              Versiune candidat
+              <select
+                className={selectClass}
+                value={candidateVersion}
+                onChange={(event) =>
+                  setCandidateVersion(Number(event.target.value))
+                }
+              >
+                {versions.map((version) => (
+                  <option key={version} value={version}>
+                    v{version}
+                    {version === liveVersion ? " (live)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              type="button"
+              disabled={pending || candidateVersion === liveVersion}
+              onClick={() => run(() => actions.simulateVersion(candidateVersion))}
+            >
+              Simulează
+            </Button>
+          </div>
+          {candidateVersion === liveVersion && (
+            <p className="text-xs text-[var(--muted)]">
+              Versiunea publicată este propria referință; alege alta pentru a
+              compara.
+            </p>
+          )}
+        </section>
+
+        <section className="panel flex flex-col gap-3 p-4">
+          <div>
+            <h2 className="font-medium">Triază incidentele antifraudă</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Pornește de la comenzile blocate real. Aplicația calculează rata de
+              blocare, valoarea refuzată și clienții blocați deși au comenzi
+              plătite; modelul doar clasifică fiecare incident.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={pending || !aiConfigured}
+            className="self-start"
+            onClick={() => run(actions.triageFraud)}
+          >
+            Triază
+          </Button>
         </section>
 
         <section className="panel flex flex-col gap-3 p-4">
@@ -248,7 +316,7 @@ export function AiConsole({
 
       <section>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="eyebrow">Sugestii</h2>
+          <h2 className="text-xs text-[var(--muted)]">Sugestii</h2>
           <Badge tone="muted">{suggestions.length}</Badge>
           <span className="text-xs text-[var(--muted)]">
             Aprobarea creează un draft — publicarea rămâne o acțiune umană

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { cartSubtotal, getCartForStore } from "@/lib/cart";
-import { customerContext } from "@/lib/customer";
+import { customerContext, storeLoyaltyPoints } from "@/lib/customer";
 import { runDecision } from "@/lib/decide";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateGuestId, getStoreBySlug } from "@/lib/store";
@@ -25,13 +25,7 @@ export async function placeOrder(
   const cart = await getCartForStore(store.id);
   if (cart.items.length === 0) return { error: "Coșul este gol" };
 
-  let loyaltyPoints = 0;
-  if (session?.user?.id) {
-    loyaltyPoints =
-      (
-        await prisma.user.findUnique({ where: { id: session.user.id } })
-      )?.loyaltyPoints ?? 0;
-  }
+  const loyaltyPoints = await storeLoyaltyPoints(store.id, session?.user?.id);
   const customer = customerContext(session, loyaltyPoints);
 
   // Price each line through engine
@@ -198,8 +192,10 @@ export async function placeOrder(
     });
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
     if (session?.user?.id && points > 0) {
-      await tx.user.update({
-        where: { id: session.user.id },
+      await tx.membership.update({
+        where: {
+          storeId_userId: { storeId: store.id, userId: session.user.id },
+        },
         data: { loyaltyPoints: { increment: points } },
       });
     }

@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 import { OPERATORS_BY_TYPE, customAttributePath } from "@ruleshop/engine";
 import type { FieldType } from "@ruleshop/engine";
+import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { AddButton, Modal } from "./ui/modal";
 
 /**
  * Editor for a store's customer attribute definitions.
@@ -63,35 +65,104 @@ export function AttributeManager({
     });
   }
 
+  const list = useListQuery({
+    items: attributes,
+    searchText: (a) =>
+      `${a.key} ${a.label} ${a.description} ${a.type}`,
+    filters: [
+      {
+        key: "type",
+        predicate: (a, v) => a.type === v,
+      },
+      {
+        key: "status",
+        predicate: (a, v) => (v === "active" ? !a.archived : a.archived),
+      },
+    ],
+    sorts: {
+      label: (a, b) => a.label.localeCompare(b.label),
+      key: (a, b) => a.key.localeCompare(b.key),
+      type: (a, b) => a.type.localeCompare(b.type) || a.label.localeCompare(b.label),
+    },
+    defaultSort: "label",
+  });
+
+  const [creating, setCreating] = useState(false);
+
   return (
     <div className="flex flex-col gap-8">
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           {error}
         </p>
       )}
 
-      <NewAttributeForm
-        disabled={pending}
-        onSubmit={(input) => run(() => actions.onCreate(input))}
-      />
-
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">
-          Atribute definite ({attributes.length})
+        <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
+          Atribute definite
+          <span className="text-sm font-normal tabular-nums text-[var(--muted)]">
+            {list.resultCount === list.totalCount
+              ? list.totalCount
+              : `${list.resultCount} / ${list.totalCount}`}
+          </span>
         </h2>
 
+        <DataToolbar
+          search={list.search}
+          onSearchChange={list.setSearch}
+          searchPlaceholder="Caută atribut…"
+          filters={[
+            {
+              key: "type",
+              label: "Tip",
+              options: TYPES.map((t) => ({
+                value: t.value,
+                label: t.label,
+              })),
+            },
+            {
+              key: "status",
+              label: "Stare",
+              options: [
+                { value: "active", label: "Active" },
+                { value: "archived", label: "Arhivate" },
+              ],
+            },
+          ]}
+          filterValues={list.filterValues}
+          onFilterChange={list.setFilter}
+          sorts={[
+            { value: "label", label: "Etichetă" },
+            { value: "key", label: "Cheie" },
+            { value: "type", label: "Tip" },
+          ]}
+          sort={list.sort}
+          onSortChange={list.setSort}
+          resultCount={list.resultCount}
+          totalCount={list.totalCount}
+          showCount={false}
+          actions={
+            <AddButton
+              label="Adaugă atribut"
+              onClick={() => setCreating(true)}
+            />
+          }
+        />
+
         {attributes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
-            Niciun atribut definit. Atributele adăugate aici devin variabile în
-            editorul de reguli și câmpuri în profilul clientului.
+          <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
+            Niciun atribut definit.
+          </p>
+        ) : list.filtered.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--muted)]">
+            Niciun rezultat
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {attributes.map((attribute) => (
+            {list.filtered.map((attribute) => (
               <AttributeCard
                 key={attribute.id}
                 attribute={attribute}
@@ -108,8 +179,35 @@ export function AttributeManager({
           </ul>
         )}
       </section>
+
+      <Modal
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="Atribut nou"
+      >
+        <NewAttributeForm
+          disabled={pending}
+          onSubmit={(input) => {
+            run(async () => {
+              await actions.onCreate(input);
+              setCreating(false);
+            });
+          }}
+        />
+      </Modal>
     </div>
   );
+}
+
+function slugifyKey(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/^([^a-z].*)$/, "a$1")
+    .slice(0, 40);
 }
 
 function NewAttributeForm({
@@ -119,129 +217,164 @@ function NewAttributeForm({
   onSubmit: (input: unknown) => void;
   disabled: boolean;
 }) {
+  const [label, setLabel] = useState("");
+  const [key, setKey] = useState("");
+  const [keyTouched, setKeyTouched] = useState(false);
   const [type, setType] = useState<FieldType>("string");
+  const [description, setDescription] = useState("");
   const [optionsText, setOptionsText] = useState("");
+  const [showOnProfile, setShowOnProfile] = useState(true);
+  const [required, setRequired] = useState(false);
 
-  const selected = TYPES.find((t) => t.value === type)!;
+  const keyValid = /^[a-z][a-z0-9_]*$/.test(key);
+  const options =
+    type === "enum"
+      ? optionsText
+          .split(",")
+          .map((o) => o.trim())
+          .filter(Boolean)
+      : [];
+  const canSubmit =
+    label.trim().length > 0 &&
+    keyValid &&
+    (type !== "enum" || options.length > 0);
+
+  function reset() {
+    setLabel("");
+    setKey("");
+    setKeyTouched(false);
+    setType("string");
+    setDescription("");
+    setOptionsText("");
+    setShowOnProfile(true);
+    setRequired(false);
+  }
 
   return (
     <form
-      className="flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5"
-      action={(formData) => {
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!canSubmit || disabled) return;
         onSubmit({
-          key: String(formData.get("key") ?? ""),
-          label: String(formData.get("label") ?? ""),
-          description: String(formData.get("description") ?? ""),
+          key,
+          label: label.trim(),
+          description: description.trim(),
           type,
-          options:
-            type === "enum"
-              ? optionsText
-                  .split(",")
-                  .map((o) => o.trim())
-                  .filter(Boolean)
-              : [],
-          required: formData.get("required") === "on",
-          showOnProfile: formData.get("showOnProfile") === "on",
+          options,
+          required,
+          showOnProfile,
         });
-        setOptionsText("");
+        reset();
       }}
     >
-      <div>
-        <h2 className="text-lg font-semibold">Atribut nou</h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          Definește un câmp de client. Va apărea în editorul de reguli ca
-          variabilă tipizată și în profilul clientului ca formular.
-        </p>
-      </div>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium">Etichetă</span>
+        <Input
+          value={label}
+          onChange={(e) => {
+            const next = e.target.value;
+            setLabel(next);
+            if (!keyTouched) setKey(slugifyKey(next));
+          }}
+          placeholder="Oraș"
+          maxLength={80}
+          required
+        />
+      </label>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Cheie</span>
-          <Input
-            name="key"
-            required
-            pattern="[a-z][a-z0-9_]*"
-            placeholder="oras"
-            title="Litere mici, cifre și _, începând cu o literă"
-          />
-          <span className="text-xs text-[var(--muted)]">
-            Folosită în reguli. Nu se poate schimba ulterior.
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium">Cheie</span>
+        <Input
+          value={key}
+          onChange={(e) => {
+            setKeyTouched(true);
+            setKey(
+              e.target.value
+                .toLowerCase()
+                .replace(/[^a-z0-9_]/g, "")
+                .slice(0, 40),
+            );
+          }}
+          required
+          pattern="[a-z][a-z0-9_]*"
+          placeholder="oras"
+          spellCheck={false}
+          className="font-mono"
+        />
+        {keyValid ? (
+          <span className="font-mono text-xs text-[var(--muted)]">
+            {customAttributePath(key)}
           </span>
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Etichetă</span>
-          <Input name="label" required placeholder="Oraș" maxLength={80} />
-          <span className="text-xs text-[var(--muted)]">
-            Textul văzut de client și de autorul regulii.
+        ) : key.length > 0 ? (
+          <span className="text-xs text-[var(--danger)]">
+            Litere mici, cifre și _; începe cu o literă.
           </span>
-        </label>
+        ) : null}
+      </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Tip de date</span>
-          <select
-            name="type"
-            value={type}
-            onChange={(e) => setType(e.target.value as FieldType)}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-          >
-            {TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label} — {t.hint}
-              </option>
-            ))}
-          </select>
-          <span className="text-xs text-[var(--muted)]">
-            Determină operatorii permiși: {OPERATORS_BY_TYPE[type].join(", ")}
-          </span>
-        </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium">Tip</span>
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as FieldType)}
+          className="squircle rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm"
+        >
+          {TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Descriere</span>
-          <Input
-            name="description"
-            placeholder="Opțional — pentru autorii de reguli"
-            maxLength={300}
-          />
-        </label>
-      </div>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="font-medium">Descriere</span>
+        <Input
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Opțional"
+          maxLength={300}
+        />
+      </label>
 
       {type === "enum" && (
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Opțiuni permise</span>
+          <span className="font-medium">Opțiuni</span>
           <Input
             value={optionsText}
             onChange={(e) => setOptionsText(e.target.value)}
             placeholder="Cluj, Iași, Timișoara"
             required
           />
-          <span className="text-xs text-[var(--muted)]">
-            Separate prin virgulă. Regulile pot compara doar cu aceste valori.
-          </span>
         </label>
       )}
 
-      <div className="flex flex-wrap gap-6">
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="showOnProfile" defaultChecked />
-          Vizibil în profilul clientului
+      <div className="flex flex-col gap-3 text-sm">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={showOnProfile}
+            onChange={(e) => setShowOnProfile(e.target.checked)}
+          />
+          În profil
         </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="required" />
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={(e) => setRequired(e.target.checked)}
+          />
           Obligatoriu
         </label>
       </div>
 
-      <p className="text-xs text-[var(--muted)]">
-        Cale generată în reguli:{" "}
-        <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5">
-          {customAttributePath("cheie")}
-        </code>{" "}
-        · tip {selected.label.toLowerCase()}
-      </p>
-
-      <Button type="submit" disabled={disabled} className="self-start">
-        Adaugă atribut
+      <Button
+        type="submit"
+        disabled={disabled || !canSubmit}
+        className="self-start"
+      >
+        Adaugă
       </Button>
     </form>
   );
@@ -268,7 +401,7 @@ function AttributeCard({
   return (
     <li
       className={
-        "rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 " +
+        "rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 " +
         (attribute.archived ? "opacity-60" : "")
       }
     >

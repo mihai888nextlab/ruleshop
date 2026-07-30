@@ -8,12 +8,10 @@ import { prisma } from "./prisma";
  *
  * Customers authenticate with a bearer token rather than a cookie, because the
  * storefront runs on a different origin than the control plane and cross-site
- * credentialled cookies are both fragile and a CSRF liability. The storefront
- * holds the token server-side and never exposes it to the browser.
+ * credentialled cookies are both fragile and a CSRF liability.
  *
- * Staff sessions are separate (Auth.js, see lib/auth.ts). A customer token is
- * signed with a different secret and is therefore useless against staff routes
- * even if one leaks.
+ * Tokens are bound to a storeId so a session minted for atelier-nord cannot be
+ * replayed against circuit-hub — even with a valid signature.
  */
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
@@ -31,13 +29,14 @@ function secret(): Uint8Array {
 const claimsSchema = z.object({
   sub: z.string().min(1),
   email: z.string().email(),
+  storeId: z.string().min(1),
 });
 
-export async function signCustomerToken(user: {
-  id: string;
-  email: string;
-}): Promise<{ token: string; expiresIn: number }> {
-  const token = await new SignJWT({ email: user.email })
+export async function signCustomerToken(
+  user: { id: string; email: string },
+  storeId: string,
+): Promise<{ token: string; expiresIn: number }> {
+  const token = await new SignJWT({ email: user.email, storeId })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -51,7 +50,7 @@ export async function signCustomerToken(user: {
 
 async function verifyCustomerToken(
   token: string,
-): Promise<{ userId: string; email: string } | null> {
+): Promise<{ userId: string; email: string; storeId: string } | null> {
   try {
     const { payload } = await jwtVerify(token, secret(), {
       issuer: "ruleshop-control-plane",
@@ -59,9 +58,12 @@ async function verifyCustomerToken(
     });
     const parsed = claimsSchema.safeParse(payload);
     if (!parsed.success) return null;
-    return { userId: parsed.data.sub, email: parsed.data.email };
+    return {
+      userId: parsed.data.sub,
+      email: parsed.data.email,
+      storeId: parsed.data.storeId,
+    };
   } catch {
-    // Expired, tampered, or wrong secret. All are simply "not authenticated".
     return null;
   }
 }
@@ -72,10 +74,6 @@ export type ApiIdentity =
 
 /**
  * Guest ids come from an untrusted client, so they are normalised before use.
- * They feed the canary hash, and an unbounded value would let a caller both
- * bloat stored rows and fish for a bucket that lands in the canary cohort.
- * Shape is constrained; cohort shopping is inherent to anonymous traffic and is
- * accepted for guests, while logged-in users are bucketed on their user id.
  */
 const GUEST_ID_PATTERN = /^g_[A-Za-z0-9_-]{8,64}$/;
 
@@ -84,34 +82,38 @@ function normaliseGuestId(raw: string | null): string {
   return "g_anonymous";
 }
 
+/**
+ * Resolves the caller for a store-scoped request.
+ *
+ * `storeId` is required: a bearer token for another store is ignored (guest),
+ * so multi-tenant isolation does not depend on the client “being honest”.
+ */
 export async function resolveApiIdentity(
   request: Request,
+  storeId: string,
 ): Promise<ApiIdentity> {
   const authHeader = request.headers.get("authorization");
   const bearer = authHeader?.toLowerCase().startsWith("bearer ")
     ? authHeader.slice(7).trim()
     : null;
 
-  if (bearer) {
+  if (bearer && !bearer.startsWith("rsk_")) {
     const claims = await verifyCustomerToken(bearer);
-    if (claims) {
-      /**
-       * A validly signed token can still name a subject that no longer exists —
-       * the account was deleted, or the database was rebuilt while a browser kept
-       * its cookie. Trusting the signature alone would hand every downstream
-       * caller a userId that violates its foreign keys, which surfaces as an
-       * opaque 500 rather than as "not signed in".
-       *
-       * One primary-key lookup per authenticated request is a fair price for
-       * that, and it also means a deleted account's token stops working at once
-       * instead of when it expires.
-       */
+    if (claims && claims.storeId === storeId) {
       const subject = await prisma.user.findUnique({
         where: { id: claims.userId },
-        select: { id: true },
+        select: {
+          id: true,
+          memberships: {
+            where: { storeId },
+            select: { id: true },
+            take: 1,
+          },
+        },
       });
 
-      if (subject) {
+      // Deleted account or no membership at this store → guest.
+      if (subject && subject.memberships.length > 0) {
         return {
           kind: "user",
           userId: claims.userId,
@@ -121,9 +123,6 @@ export async function resolveApiIdentity(
       }
     }
   }
-
-  // No token, an unverifiable one, or one naming a subject that is gone: this
-  // request is anonymous and continues as a guest.
 
   const guestId = normaliseGuestId(request.headers.get("x-guest-id"));
   return { kind: "guest", guestId, subjectKey: `guest:${guestId}` };

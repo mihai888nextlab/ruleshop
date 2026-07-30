@@ -1,0 +1,415 @@
+@import "tailwindcss";
+
+/*
+ * Cool stone + ink. Every visual value is a token so a published `theme`
+ * decision can restyle the shop by swapping `[data-theme]` alone.
+ */
+
+:root {
+  --font-syne: "Syne", sans-serif;
+  --font-fraunces: "Fraunces", serif;
+  --font-playfair: "Playfair Display", serif;
+  --font-spaceGrotesk: "Space Grotesk", sans-serif;
+  --font-figtree: "Figtree", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-lora: "Lora", serif;
+}
+
+:root,
+[data-theme="default"] {
+  --bg: #eef0ee;
+  --bg-deep: #e2e6e2;
+  --fg: #121512;
+  --muted: #5f6661;
+  --surface: #f8f9f7;
+  --surface-2: #dfe3df;
+  --border: #c8cec8;
+  --rule: #121512;
+  --accent: #121512;
+  --accent-fg: #f4f6f4;
+  --positive: #2a5a42;
+  --warning: #8a5a12;
+  --danger: #8f2c2c;
+  --radius: 0px;
+  --display-weight: 600;
+  --display-tracking: -0.04em;
+  --product-ratio: 3 / 4;
+  /*
+   * Default faces. The root layout loads every theme-selectable font and exposes
+   * one variable each, so these point at two of them. A theme composed in the
+   * control plane overrides these two properties inline and nothing else, which
+   * is how typography becomes part of a theme without any component knowing.
+   */
+  --font-display: var(--font-syne);
+  --font-body: var(--font-figtree);
+  /* Vertical rhythm multiplier, set by a theme's density token. */
+  --density: 1;
+  --hero-overlay: linear-gradient(
+    105deg,
+    rgba(18, 21, 18, 0.72) 0%,
+    rgba(18, 21, 18, 0.35) 48%,
+    rgba(18, 21, 18, 0.12) 100%
+  );
+}
+
+/* Atelier Nord — cool mineral fashion. */
+[data-theme="nord"] {
+  --bg: #ecefe9;
+  --bg-deep: #dce3d8;
+  --fg: #101612;
+  --muted: #5a635c;
+  --surface: #f6f8f5;
+  --surface-2: #d5ddd4;
+  --border: #c0c9bf;
+  --rule: #1c2b24;
+  --accent: #1c2b24;
+  --accent-fg: #eef3ef;
+  --positive: #2a5a42;
+  --warning: #8a5a12;
+  --danger: #8f2c2c;
+  --radius: 0px;
+  --product-ratio: 3 / 4;
+  --hero-overlay: linear-gradient(
+    105deg,
+    rgba(16, 22, 18, 0.78) 0%,
+    rgba(28, 43, 36, 0.42) 52%,
+    rgba(28, 43, 36, 0.08) 100%
+  );
+  background:
+    radial-gradient(
+      1200px 600px at 12% -10%,
+      color-mix(in oklab, var(--bg-deep) 70%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 90% 8%,
+      color-mix(in oklab, var(--surface-2) 55%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+}
+
+/* Circuit Hub — cool technical slate, amber signal. */
+[data-theme="circuit"] {
+  --bg: #e6ebf1;
+  --bg-deep: #d0d8e3;
+  --fg: #0e141c;
+  --muted: #5a6674;
+  --surface: #f3f6fa;
+  --surface-2: #c9d3e0;
+  --border: #aeb9c8;
+  --rule: #0e141c;
+  --accent: #c45a0c;
+  --accent-fg: #fff8f1;
+  --positive: #14503a;
+  --warning: #7d5210;
+  --danger: #8a2020;
+  --radius: 0px;
+  --display-weight: 700;
+  --display-tracking: -0.055em;
+  --product-ratio: 1 / 1;
+  --hero-overlay: linear-gradient(
+    115deg,
+    rgba(10, 16, 24, 0.82) 0%,
+    rgba(14, 22, 32, 0.48) 46%,
+    rgba(14, 22, 32, 0.12) 100%
+  );
+  background:
+    linear-gradient(
+        color-mix(in oklab, var(--border) 40%, transparent) 1px,
+        transparent 1px
+      )
+      0 0 / 48px 48px,
+    linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--border) 40%, transparent) 1px,
+        transparent 1px
+      )
+      0 0 / 48px 48px,
+    radial-gradient(
+      1000px 520px at 88% -8%,
+      color-mix(in oklab, #c45a0c 14%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+}
+
+[data-theme="circuit"] .eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.14em;
+}
+
+[data-theme="circuit"] .btn {
+  letter-spacing: 0.08em;
+}
+
+[data-theme="circuit"] .product-media {
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+}
+
+[data-theme="midnight"] {
+  --bg: #12131a;
+  --bg-deep: #0c0d12;
+  --fg: #f2f1ee;
+  --muted: #9a9aa8;
+  --surface: #1a1c25;
+  --surface-2: #23262f;
+  --border: #34384a;
+  --rule: #f2f1ee;
+  --accent: #c9b48a;
+  --accent-fg: #12131a;
+  --positive: #6fcf9f;
+  --warning: #e0b357;
+  --danger: #e88b8b;
+  --radius: 0px;
+  --product-ratio: 3 / 4;
+  --hero-overlay: linear-gradient(
+    105deg,
+    rgba(8, 9, 14, 0.82) 0%,
+    rgba(8, 9, 14, 0.45) 50%,
+    rgba(8, 9, 14, 0.15) 100%
+  );
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 12% -10%, color-mix(in oklab, var(--bg-deep) 70%, transparent), transparent 60%),
+    radial-gradient(900px 500px at 90% 8%, color-mix(in oklab, var(--surface-2) 55%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+  background-attachment: fixed;
+  color: var(--fg);
+  min-height: 100vh;
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition:
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.display {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  font-weight: var(--display-weight, 600);
+  letter-spacing: var(--display-tracking, -0.04em);
+  line-height: 0.95;
+}
+
+.eyebrow {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+a {
+  color: inherit;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 0.85rem 1.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition:
+    transform 220ms ease,
+    background-color 220ms ease,
+    color 220ms ease,
+    border-color 220ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--fg);
+  border-color: color-mix(in oklab, var(--fg) 35%, transparent);
+}
+
+.btn-ghost:hover {
+  border-color: var(--fg);
+}
+
+.btn-on-dark {
+  border-color: #f4f6f4;
+  background: #f4f6f4;
+  color: #121512;
+}
+
+.btn-ghost-on-dark {
+  border-color: color-mix(in oklab, #f4f6f4 45%, transparent);
+  background: transparent;
+  color: #f4f6f4;
+}
+
+.btn-ghost-on-dark:hover {
+  border-color: #f4f6f4;
+}
+
+.field {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 0.55rem 0;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.field:focus {
+  border-color: var(--accent);
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(14px);
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 70%, transparent);
+}
+
+.nav-link {
+  position: relative;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -0.2rem;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 280ms ease;
+}
+
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
+.hero {
+  position: relative;
+  min-height: min(92vh, 920px);
+  display: grid;
+  align-items: end;
+  overflow: hidden;
+  color: #f4f6f4;
+}
+
+.hero-mineral {
+  background:
+    radial-gradient(900px 520px at 18% 20%, color-mix(in oklab, var(--surface-2) 80%, transparent), transparent 60%),
+    linear-gradient(135deg, var(--bg) 0%, var(--bg-deep) 55%, var(--surface-2) 100%);
+}
+
+.hero-media {
+  position: absolute;
+  inset: 0;
+}
+
+.hero-media img {
+  object-fit: cover;
+  animation: hero-ken 18s ease-out forwards;
+}
+
+.hero-shade {
+  position: absolute;
+  inset: 0;
+  background: var(--hero-overlay);
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 1;
+  width: min(1120px, calc(100% - 2.5rem));
+  margin: 0 auto;
+  padding: 7rem 0 4.5rem;
+}
+
+.product-media {
+  aspect-ratio: var(--product-ratio, 3 / 4);
+}
+
+.reveal {
+  animation: rise 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.reveal-delay-1 {
+  animation-delay: 120ms;
+}
+
+.reveal-delay-2 {
+  animation-delay: 220ms;
+}
+
+.reveal-delay-3 {
+  animation-delay: 320ms;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-ken {
+  from {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  *,
+  .hero-media img,
+  .reveal,
+  .reveal-delay-1,
+  .reveal-delay-2,
+  .reveal-delay-3 {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/*
+ * Density.
+ *
+ * A theme's density token scales vertical rhythm rather than changing any
+ * layout: `--density` multiplies the page's block padding, so the same design
+ * reads as compact or generous without a component branching on it.
+ */
+main > * {
+  --section-space: calc(3.5rem * var(--density, 1));
+}
+
+main .rhythm {
+  padding-block: var(--section-space);
+}

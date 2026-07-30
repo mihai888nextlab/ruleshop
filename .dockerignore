@@ -1,0 +1,9 @@
+# Ignore everything by default when building from repo root with
+# -f apps/storefront/Dockerfile — then re-include the storefront app.
+*
+!apps/storefront/
+apps/storefront/node_modules
+apps/storefront/dist
+apps/storefront/.env
+apps/storefront/.env.*
+!apps/storefront/.env.example

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type {
   RuleFinding,
+  RuleImpact,
   RuleUsage,
   SimulationResult,
 } from "@ruleshop/engine";
@@ -12,11 +13,16 @@ import {
   proposeRuleImprovement,
   reviewSuggestion,
   simulateSuggestion,
+  simulateVersion,
+  triageFraudIncidents,
 } from "@/app/actions/ai";
 import { AiConsole } from "@/components/ai/ai-console";
+import type { FraudTriageView } from "@/components/ai/fraud-panel";
 import type { SuggestionView } from "@/components/ai/suggestion-card";
 import { requireStoreRole } from "@/lib/auth";
 import { isAiConfigured } from "@/lib/ai";
+import type { TrustAssessment } from "@/lib/ai-trust";
+import type { FraudStats } from "@/lib/fraud-analysis";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 
@@ -112,6 +118,47 @@ export default async function AiPage({
         row.metrics && typeof row.metrics === "object" && "deltas" in row.metrics
           ? (row.metrics as unknown as SimulationResult)
           : null,
+
+      impacts: Array.isArray(analysis.impacts)
+        ? (analysis.impacts as RuleImpact[])
+        : [],
+      replaySampleSize:
+        typeof analysis.replaySampleSize === "number"
+          ? analysis.replaySampleSize
+          : 0,
+      trust:
+        proposal.trust && typeof proposal.trust === "object"
+          ? (proposal.trust as unknown as TrustAssessment)
+          : null,
+      // A triage stores the application's statistics in `analysis` and the
+      // model's labels in `proposal`, and they are recombined here for display
+      // without ever being merged into one object.
+      fraud:
+        row.kind === "fraud_triage" && "incidents" in analysis
+          ? ({
+              stats: analysis as unknown as FraudStats,
+              classifications: Array.isArray(proposal.classifications)
+                ? (proposal.classifications as FraudTriageView["classifications"])
+                : [],
+              recommendation:
+                typeof proposal.recommendation === "string"
+                  ? proposal.recommendation
+                  : null,
+              dropped: Array.isArray(proposal.dropped)
+                ? (proposal.dropped as string[])
+                : [],
+            } satisfies FraudTriageView)
+          : null,
+      versions:
+        typeof analysis.candidateVersion === "number"
+          ? {
+              candidate: analysis.candidateVersion,
+              live:
+                typeof analysis.liveVersion === "number"
+                  ? analysis.liveVersion
+                  : null,
+            }
+          : null,
     };
   });
 
@@ -121,7 +168,7 @@ export default async function AiPage({
         <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
           ← Control plane
         </Link>
-        <h1 className="display text-3xl">Asistent AI</h1>
+        <h1 className="font-semibold tracking-tight text-3xl">Asistent AI</h1>
         <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
           Constatările și cifrele de pe această pagină sunt calculate de
           aplicație prin reluarea evaluărilor reale. Modelul este folosit doar
@@ -149,6 +196,10 @@ export default async function AiPage({
             to: number,
           ) => Promise<unknown>,
           simulate: simulateSuggestion.bind(null, slug),
+          simulateVersion: simulateVersion.bind(null, slug) as (
+            version: number,
+          ) => Promise<unknown>,
+          triageFraud: triageFraudIncidents.bind(null, slug),
           review: reviewSuggestion.bind(null, slug) as (
             id: string,
             decision: "approved" | "rejected",

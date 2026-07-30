@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
-import { SiteHeader } from "@/components/site-header";
 import { auth } from "@/lib/auth";
-import { customerContext } from "@/lib/customer";
+import { customerContext, storeLoyaltyPoints } from "@/lib/customer";
 import { runDecision } from "@/lib/decide";
 import { getOrCreateGuestId, getStoreBySlug } from "@/lib/store";
-import { prisma } from "@/lib/prisma";
 
+/**
+ * Store theme shell only. Storefront pages add StorefrontChrome; admin pages
+ * add StoreDashboard so the two UIs can diverge without fighting over chrome.
+ */
 export default async function StoreLayout({
   children,
   params,
@@ -23,11 +25,7 @@ export default async function StoreLayout({
     ? `user:${session.user.id}`
     : `guest:${guestId}`;
 
-  let userPoints = 0;
-  if (session?.user?.id) {
-    const u = await prisma.user.findUnique({ where: { id: session.user.id } });
-    userPoints = u?.loyaltyPoints ?? 0;
-  }
+  const userPoints = await storeLoyaltyPoints(store.id, session?.user?.id);
 
   const themeDecision = await runDecision({
     storeId: store.id,
@@ -48,9 +46,8 @@ export default async function StoreLayout({
         : "nord";
 
   return (
-    <div className="mesh min-h-screen" data-theme={themeId}>
-      <SiteHeader store={{ id: store.id, slug: store.slug, name: store.name }} />
-      <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+    <div className="min-h-screen" data-theme={themeId}>
+      {children}
     </div>
   );
 }

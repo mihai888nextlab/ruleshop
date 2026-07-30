@@ -18,7 +18,7 @@ export async function GET(
     const store = await findStoreBySlug(slug);
     if (!store) return apiError("Magazin inexistent", 404);
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     const detail = await buildProductDetail({ store, identity, productSlug });
     if (!detail) return apiError("Produs inexistent", 404);
 

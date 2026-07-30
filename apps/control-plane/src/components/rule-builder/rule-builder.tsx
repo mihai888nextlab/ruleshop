@@ -11,9 +11,9 @@ import {
   type FieldDef,
 } from "@ruleshop/engine";
 import { Button } from "../ui/button";
-import { ActionList, defaultActionFor } from "./action-list";
-import { ConditionTree } from "./condition-tree";
+import { defaultActionFor } from "./action-list";
 import { classifyErrors, fieldsInScope } from "./schema-utils";
+import { RuleScriptBoard } from "./rule-script-board";
 
 /**
  * Visual rule editor.
@@ -195,10 +195,10 @@ export function RuleBuilder({
   };
 
   const inputClass =
-    "rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm";
+    "squircle rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm";
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+    <div className="panel flex flex-col gap-4 p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">Cheie</span>
@@ -229,8 +229,6 @@ export function RuleBuilder({
             value={draft.category}
             onChange={(e) => {
               const category = e.target.value as DecisionType;
-              // Actions are kept rather than reset: discarding an author's work
-              // on a mis-click is worse than showing that they no longer fit.
               patch({ category });
             }}
           >
@@ -250,9 +248,6 @@ export function RuleBuilder({
             value={draft.priority}
             onChange={(e) => patch({ priority: Number(e.target.value) })}
           />
-          <span className="text-xs text-[var(--muted)]">
-            Mai mare câștigă conflictele.
-          </span>
         </label>
       </div>
 
@@ -275,37 +270,21 @@ export function RuleBuilder({
         </label>
       </div>
 
-      {/* Dark canvas: the blocks are the focus, and saturated block colours read
-          as deliberate tooling here rather than as decoration. */}
-      <div className="flex flex-col gap-3 rounded-xl bg-[#0b0e14] p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded bg-white/15 px-2 py-0.5 text-xs font-semibold text-white">
-            DACĂ
-          </span>
-          <span className="text-xs text-white/40">
-            condițiile evaluate pentru fiecare decizie
-          </span>
-        </div>
-
-        <ConditionTree
-          value={draft.conditions}
-          onChange={(conditions) => patch({ conditions })}
-          schema={schema}
-          fieldsInScope={scopedFields}
-          errorsByPath={classified.byPath}
-        />
-
-        <ActionList
-          actions={draft.actions}
-          decisionType={draft.category}
-          onChange={(actions) => patch({ actions })}
-          errors={classified.actionErrors}
-          themeKeys={themeKeys}
-        />
-      </div>
+      <RuleScriptBoard
+        conditions={draft.conditions}
+        onConditionsChange={(conditions) => patch({ conditions })}
+        actions={draft.actions}
+        onActionsChange={(actions) => patch({ actions })}
+        decisionType={draft.category}
+        schema={schema}
+        fieldsInScope={scopedFields}
+        errorsByPath={classified.byPath}
+        actionErrors={classified.actionErrors}
+        themeKeys={themeKeys}
+      />
 
       {classified.generalErrors.length > 0 && (
-        <ul className="flex flex-col gap-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2">
+        <ul className="flex flex-col gap-1 rounded-[var(--radius)] border border-amber-300 bg-amber-50 px-3 py-2">
           {classified.generalErrors.map((error, i) => (
             <li key={i} className="text-sm text-amber-900">
               {error}
@@ -317,7 +296,7 @@ export function RuleBuilder({
       {saveError && (
         <p
           role="alert"
-          className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
           {saveError}
         </p>
@@ -357,9 +336,9 @@ export function RuleBuilder({
         </Button>
 
         {validation.ok ? (
-          <span className="text-sm text-emerald-700">Regulă validă</span>
+          <span className="text-sm text-[var(--ok)]">Regulă validă</span>
         ) : (
-          <span className="text-sm text-red-700">
+          <span className="text-sm text-[var(--danger)]">
             {validation.errors.length}{" "}
             {validation.errors.length === 1 ? "problemă" : "probleme"}
           </span>
@@ -370,17 +349,15 @@ export function RuleBuilder({
 
       {showJson && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-[var(--muted)]">
-            Forma stocată și evaluată de motor. Poate fi editată direct — util
-            pentru a aplica o propunere generată de modulul AI.
-          </p>
           <textarea
-            className="min-h-64 rounded-md border border-[var(--border)] bg-[var(--surface-2)] p-2 font-mono text-xs"
+            className="min-h-64 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] p-2 font-mono text-xs"
             value={jsonText}
             onChange={(e) => setJsonText(e.target.value)}
             spellCheck={false}
           />
-          {jsonError && <p className="text-sm text-red-700">{jsonError}</p>}
+          {jsonError && (
+            <p className="text-sm text-[var(--danger)]">{jsonError}</p>
+          )}
           <Button
             type="button"
             variant="secondary"

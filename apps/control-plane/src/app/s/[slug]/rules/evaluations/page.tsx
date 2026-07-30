@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { PageHeader } from "@/components/dashboard/shell";
+import { EvaluationList } from "@/components/lists/evaluation-list";
 import { requireStoreRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
-import { Badge } from "@/components/ui/badge";
 
 export default async function EvaluationsPage({
   params,
@@ -24,40 +24,54 @@ export default async function EvaluationsPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
-        ← Control plane
-      </Link>
-      <h1 className="display text-3xl">Istoric evaluări</h1>
-      <ul className="flex flex-col gap-2">
-        {evaluations.map((e) => (
-          <li
-            key={e.id}
-            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
-          >
-            <div className="flex flex-wrap gap-2">
-              <Badge>{e.decisionType}</Badge>
-              {e.rulesetVersion != null && (
-                <Badge tone="muted">v{e.rulesetVersion}</Badge>
-              )}
-              {e.isCanary && <Badge tone="warn">canary</Badge>}
-              <span className="text-[var(--muted)]">
-                {e.createdAt.toLocaleString("ro-RO")}
-              </span>
-            </div>
-            <p className="mt-1">
-              Reguli:{" "}
-              {(e.matchedRules as string[] | null)?.join(", ") || "—"}
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded bg-[var(--surface-2)] p-2 text-xs">
-              {JSON.stringify(
-                { decision: e.decision, explanation: e.explanation },
-                null,
-                2,
-              )}
-            </pre>
-          </li>
-        ))}
-      </ul>
+      <PageHeader title="Istoric evaluări" />
+      <EvaluationList
+        slug={slug}
+        evaluations={evaluations.map((e) => ({
+          id: e.id,
+          decisionType: e.decisionType,
+          rulesetVersion: e.rulesetVersion,
+          isCanary: e.isCanary,
+          matchedRules: asStringArray(e.matchedRules),
+          createdAt: e.createdAt.toISOString(),
+          subjectKey: e.subjectKey,
+          decision: asRecord(e.decision),
+          explanation: asExplanation(e.explanation),
+          warnings: asStringArray(e.warnings),
+        }))}
+      />
     </div>
   );
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [];
+}
+
+function asExplanation(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((step) => {
+    if (!step || typeof step !== "object") return [];
+    const row = step as Record<string, unknown>;
+    if (typeof row.ruleKey !== "string") return [];
+    return [
+      {
+        ruleKey: row.ruleKey,
+        ruleName: typeof row.ruleName === "string" ? row.ruleName : undefined,
+        matched: Boolean(row.matched),
+        reason: typeof row.reason === "string" ? row.reason : "",
+        appliedActions: Array.isArray(row.appliedActions)
+          ? row.appliedActions
+          : undefined,
+      },
+    ];
+  });
 }

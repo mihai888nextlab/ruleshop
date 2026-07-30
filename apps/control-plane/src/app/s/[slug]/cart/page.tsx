@@ -5,6 +5,7 @@ import { getStoreBySlug } from "@/lib/store";
 import { formatRon } from "@/lib/utils";
 import { removeCartItem, updateCartItem } from "@/app/actions/cart";
 import { Button } from "@/components/ui/button";
+import { StorefrontChrome } from "@/components/storefront-chrome";
 
 export default async function CartPage({
   params,
@@ -18,8 +19,9 @@ export default async function CartPage({
   const subtotal = cartSubtotal(cart.items);
 
   return (
+    <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="flex flex-col gap-6">
-      <h1 className="display text-3xl">Coș</h1>
+      <h1 className="font-semibold tracking-tight text-3xl">Coș</h1>
       {cart.items.length === 0 ? (
         <p className="text-[var(--muted)]">
           Coșul este gol.{" "}
@@ -35,7 +37,7 @@ export default async function CartPage({
               return (
                 <li
                   key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"
                 >
                   <div>
                     <Link
@@ -97,5 +99,6 @@ export default async function CartPage({
         </>
       )}
     </div>
+    </StorefrontChrome>
   );
 }

@@ -247,6 +247,15 @@ describe("usage findings", () => {
     const findings = findUsageIssues(rules, usage, { minimumSample: 1 });
     expect(findings.some((f) => f.key === "loser")).toBe(false);
   });
+
+  it("says nothing at all when no evaluations were recorded", () => {
+    // A draft has never been evaluated, and calling all of its rules unused on
+    // the strength of zero evidence would be an accusation, not a finding.
+    const findings = findUsageIssues(rules, buildUsage(rules, []), {
+      minimumSample: 0,
+    });
+    expect(findings).toEqual([]);
+  });
 });
 
 describe("analyzeRuleset", () => {

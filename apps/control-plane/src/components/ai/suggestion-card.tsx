@@ -3,12 +3,21 @@
 import { useState, useTransition } from "react";
 import type {
   RuleFinding,
+  RuleImpact,
   RuleUsage,
   SimulationResult,
   MetricDelta,
 } from "@ruleshop/engine";
+import type { TrustAssessment } from "@/lib/ai-trust";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { FraudPanel, type FraudTriageView } from "./fraud-panel";
+import {
+  FindingsList,
+  ImpactTable,
+  SimulationTable,
+  TrustPanel,
+} from "./insight-panels";
 
 /**
  * One AI suggestion, with its provenance and measured effect.
@@ -44,6 +53,16 @@ export interface SuggestionView {
   findings: RuleFinding[];
   usage: RuleUsage | null;
   simulation: SimulationResult | null;
+
+  /** Per-rule contribution, measured by leave-one-out replay. */
+  impacts: RuleImpact[];
+  replaySampleSize: number;
+  /** The application's own assessment of how well evidenced this is. */
+  trust: TrustAssessment | null;
+  /** Fraud statistics plus the model's classification of each incident. */
+  fraud: FraudTriageView | null;
+  /** Which versions a simulation compared. */
+  versions: { candidate: number; live: number | null } | null;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -51,30 +70,9 @@ const KIND_LABEL: Record<string, string> = {
   nl_rule: "Regulă din limbaj natural",
   improvement: "Propunere de îmbunătățire",
   diff_explanation: "Explicație diferențe",
+  version_simulation: "Simulare versiune candidat",
+  fraud_triage: "Triaj incidente antifraudă",
 };
-
-const ADEQUACY_LABEL: Record<SimulationResult["sampleAdequacy"], string> = {
-  insufficient: "eșantion prea mic pentru concluzii",
-  indicative: "eșantion orientativ",
-  reasonable: "eșantion rezonabil",
-};
-
-function formatMetric(value: number, format: MetricDelta["format"]): string {
-  switch (format) {
-    case "money":
-      return new Intl.NumberFormat("ro-RO", {
-        style: "currency",
-        currency: "RON",
-        maximumFractionDigits: 2,
-      }).format(value);
-    case "percent":
-      return `${value.toFixed(1)}%`;
-    case "rate":
-      return `${(value * 100).toFixed(1)}%`;
-    case "count":
-      return String(value);
-  }
-}
 
 export function SuggestionCard({
   suggestion,
@@ -126,6 +124,14 @@ export function SuggestionCard({
         {suggestion.targetRuleKey && (
           <Badge tone="muted">{suggestion.targetRuleKey}</Badge>
         )}
+        {suggestion.versions && (
+          <Badge tone="muted">
+            v{suggestion.versions.candidate} vs{" "}
+            {suggestion.versions.live == null
+              ? "nimic publicat"
+              : `v${suggestion.versions.live}`}
+          </Badge>
+        )}
         <span className="ml-auto text-xs text-[var(--muted)]">
           {new Date(suggestion.createdAt).toLocaleString("ro-RO")}
         </span>
@@ -153,25 +159,29 @@ export function SuggestionCard({
           )}
 
           {suggestion.findings.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1">
-              {suggestion.findings.map((finding, index) => (
-                <li key={index} className="text-sm">
-                  <Badge
-                    tone={finding.severity === "warning" ? "warn" : "muted"}
-                  >
-                    {finding.code}
-                  </Badge>{" "}
-                  <span className="text-[var(--muted)]">{finding.message}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-2">
+              <FindingsList findings={suggestion.findings} />
+            </div>
           )}
         </section>
       )}
 
+      {suggestion.impacts.length > 0 && (
+        <section className="rounded border border-[var(--border)] bg-[var(--surface-2)] p-3">
+          <ImpactTable
+            impacts={suggestion.impacts}
+            sampleSize={suggestion.replaySampleSize}
+          />
+        </section>
+      )}
+
+      {suggestion.fraud && <FraudPanel view={suggestion.fraud} />}
+
       {suggestion.simulation && (
         <SimulationTable simulation={suggestion.simulation} />
       )}
+
+      {suggestion.trust && <TrustPanel trust={suggestion.trust} />}
 
       {/* Produced by the model. Kept visually distinct from the above. */}
       {(suggestion.narrative || suggestion.reasoning) && (
@@ -251,7 +261,7 @@ export function SuggestionCard({
             onChange={(event) => setNote(event.target.value)}
             placeholder="Notă de analiză (opțional)"
             maxLength={500}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+            className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap gap-2">
             {hasRule && (
@@ -299,113 +309,6 @@ export function SuggestionCard({
   );
 }
 
-function SimulationTable({ simulation }: { simulation: SimulationResult }) {
-  const changes = simulation.deltas.filter((delta) => delta.delta !== 0);
-
-  return (
-    <section className="rounded border border-[var(--border)] bg-[var(--surface-2)] p-3">
-      <div className="flex flex-wrap items-baseline gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide">
-          Simulare pe evenimente istorice
-        </h3>
-        <Badge
-          tone={
-            simulation.sampleAdequacy === "reasonable"
-              ? "ok"
-              : simulation.sampleAdequacy === "indicative"
-                ? "muted"
-                : "warn"
-          }
-        >
-          {simulation.current.sampleSize} evaluări ·{" "}
-          {ADEQUACY_LABEL[simulation.sampleAdequacy]}
-        </Badge>
-      </div>
-
-      {changes.length === 0 ? (
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Nicio diferență măsurabilă pe eșantionul disponibil.
-        </p>
-      ) : (
-        <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-md text-sm">
-            <thead>
-              <tr className="text-left text-xs text-[var(--muted)]">
-                <th className="py-1 pr-3 font-medium">Metrică</th>
-                <th className="py-1 pr-3 font-medium">Actual</th>
-                <th className="py-1 pr-3 font-medium">Candidat</th>
-                <th className="py-1 font-medium">Diferență</th>
-              </tr>
-            </thead>
-            <tbody>
-              {changes.map((delta) => {
-                // Only colour a change when the shop's preferred direction is
-                // actually known; otherwise a neutral figure would be editorial.
-                const good =
-                  delta.higherIsBetter === null
-                    ? null
-                    : delta.higherIsBetter
-                      ? delta.delta > 0
-                      : delta.delta < 0;
-
-                return (
-                  <tr
-                    key={delta.label}
-                    className="border-t border-[var(--border)]"
-                  >
-                    <td className="py-1.5 pr-3">{delta.label}</td>
-                    <td className="py-1.5 pr-3 tabular-nums text-[var(--muted)]">
-                      {formatMetric(delta.before, delta.format)}
-                    </td>
-                    <td className="py-1.5 pr-3 tabular-nums">
-                      {formatMetric(delta.after, delta.format)}
-                    </td>
-                    <td
-                      className={
-                        "py-1.5 tabular-nums " +
-                        (good === null
-                          ? ""
-                          : good
-                            ? "text-emerald-700"
-                            : "text-red-700")
-                      }
-                    >
-                      {delta.delta > 0 ? "+" : ""}
-                      {formatMetric(delta.delta, delta.format)}
-                      {delta.percentChange !== null && (
-                        <span className="ml-1 text-xs text-[var(--muted)]">
-                          ({delta.percentChange > 0 ? "+" : ""}
-                          {delta.percentChange.toFixed(1)}%)
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {simulation.ruleHitChanges.length > 0 && (
-        <p className="mt-2 text-xs text-[var(--muted)]">
-          Potriviri modificate:{" "}
-          {simulation.ruleHitChanges
-            .slice(0, 6)
-            .map((row) => `${row.key} ${row.before}→${row.after}`)
-            .join(", ")}
-        </p>
-      )}
-
-      <p className="mt-2 text-xs text-[var(--muted)]">
-        Cifrele sunt calculate de aplicație prin reluarea contextelor reale, nu
-        estimate de model. Măsoară efectul mecanic al regulilor pe trafic deja
-        petrecut, nu o schimbare de comportament al clienților.
-      </p>
-    </section>
-  );
-}
-
 function Provenance({ suggestion }: { suggestion: SuggestionView }) {
   const parts: string[] = [];
   if (suggestion.model) parts.push(`model ${suggestion.model}`);
@@ -417,7 +320,9 @@ function Provenance({ suggestion }: { suggestion: SuggestionView }) {
     );
   }
   if (suggestion.confidence != null) {
-    parts.push(`încredere declarată ${(suggestion.confidence * 100).toFixed(0)}%`);
+    // Computed by the application, not reported by the model — the model's own
+    // claim is shown in the trust panel and labelled as a claim.
+    parts.push(`încredere calculată ${(suggestion.confidence * 100).toFixed(0)}%`);
   }
 
   if (parts.length === 0 && !suggestion.rawResponse) return null;

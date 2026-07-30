@@ -1,17 +1,35 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { describeCondition } from "@/components/rule-builder/schema-utils";
-import { buildContextSchema } from "@ruleshop/engine";
-import type { Action, Condition } from "@ruleshop/engine";
-import { requireStoreRole } from "@/lib/auth";
-import { loadStoreAttributes, toFieldDef } from "@/lib/context-schema";
-import { prisma } from "@/lib/prisma";
-import { getStoreBySlug } from "@/lib/store";
-import { themeKeysFor } from "@/lib/theme-service";
+import {
+  analyzeRuleset,
+  type Action,
+  type Condition,
+  type DecisionType,
+  type HistoricalEvaluation,
+  type SimulationResult,
+} from "@ruleshop/engine";
+import { simulateVersion } from "@/app/actions/ai";
 import { deleteRuleFromDraft, saveRuleInDraft } from "@/app/actions/rules";
+import {
+  FindingsList,
+  ImpactTable,
+  SimulationTable,
+} from "@/components/ai/insight-panels";
+import { SimulateVersionButton } from "@/components/ai/simulate-version-button";
+import { PageHeader } from "@/components/dashboard/shell";
+import { RulesInVersionList } from "@/components/lists/rules-in-version-list";
 import { RuleEditorPanel } from "@/components/rule-builder/rule-editor-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { requireStoreRole } from "@/lib/auth";
+import { loadContextSchema, loadStoreAttributes, toFieldDef } from "@/lib/context-schema";
+import { toRuleDefs } from "@/lib/decide";
+import { prisma } from "@/lib/prisma";
+import { getStoreBySlug } from "@/lib/store";
+import { themeKeysFor } from "@/lib/theme-service";
+
+/** Contexts replayed to measure each rule in this version. */
+const IMPACT_LIMIT = 300;
 
 export default async function RulesetDetailPage({
   params,
@@ -34,147 +52,196 @@ export default async function RulesetDetailPage({
   if (!ruleset) notFound();
 
   const editable = ruleset.status === "draft";
-
-  // The editor needs this store's vocabulary: built-ins plus its own attributes.
   const defs = await loadStoreAttributes(store.id);
   const customFields = defs.map(toFieldDef);
-  const schema = buildContextSchema(customFields);
-
-  // Themes this store defined, so a setTheme action picks from real ones.
   const themeKeys = await themeKeysFor(store.id);
 
+  const liveVersion = store.deployment?.stableVersion ?? null;
+
   /**
-   * Rules competing for the same decision are grouped so the priority order is
-   * visible at a glance — that ordering is what resolves conflicts, and it is
-   * hard to reason about from a flat list.
+   * The same analysis the AI screen runs, shown where the rules are.
+   *
+   * None of it needs a model: the findings come from comparing conditions, and
+   * the impact figures from replaying recorded contexts with each rule taken out
+   * in turn. Usage findings are skipped for a version that has never been
+   * evaluated, which is every draft.
    */
-  const byCategory = new Map<string, typeof ruleset.rules>();
-  for (const rule of ruleset.rules) {
-    const bucket = byCategory.get(rule.category);
-    if (bucket) bucket.push(rule);
-    else byCategory.set(rule.category, [rule]);
-  }
+  const [schema, matchRows, historyRows, lastSimulation] = await Promise.all([
+    loadContextSchema(store.id),
+    prisma.evaluation.findMany({
+      where: { storeId: store.id, rulesetVersion: version },
+      orderBy: { createdAt: "desc" },
+      take: 500,
+      select: { matchedRules: true },
+    }),
+    prisma.evaluation.findMany({
+      where: { storeId: store.id },
+      orderBy: { createdAt: "desc" },
+      take: IMPACT_LIMIT,
+      select: { decisionType: true, context: true },
+    }),
+    prisma.aiSuggestion.findFirst({
+      where: {
+        storeId: store.id,
+        kind: "version_simulation",
+        analysis: { path: ["candidateVersion"], equals: version },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { metrics: true, proposal: true, createdAt: true },
+    }),
+  ]);
+
+  const rules = toRuleDefs(ruleset.rules);
+  const history: HistoricalEvaluation[] = historyRows.map((row) => ({
+    decisionType: row.decisionType,
+    context: (row.context ?? {}) as Record<string, unknown>,
+  }));
+
+  const analysis = analyzeRuleset({
+    rules,
+    schema,
+    evaluations: matchRows.map((row) => ({
+      matchedRules: Array.isArray(row.matchedRules)
+        ? (row.matchedRules as unknown[]).filter(
+            (key): key is string => typeof key === "string",
+          )
+        : [],
+    })),
+    history,
+  });
+
+  const simulationMetrics =
+    lastSimulation?.metrics &&
+    typeof lastSimulation.metrics === "object" &&
+    "deltas" in lastSimulation.metrics
+      ? (lastSimulation.metrics as unknown as SimulationResult)
+      : null;
+  const simulationNarrative = (() => {
+    const proposal = (lastSimulation?.proposal ?? {}) as {
+      narrative?: unknown;
+    };
+    return typeof proposal.narrative === "string" ? proposal.narrative : null;
+  })();
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
-            ← Control plane
-          </Link>
-          <h1 className="display text-3xl">Versiunea {version}</h1>
-          <div className="mt-1 flex items-center gap-2">
+      <PageHeader
+        title={`Versiunea ${version}`}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
             <Badge>{ruleset.status}</Badge>
-            <span className="text-sm text-[var(--muted)]">
-              {ruleset.rules.length}{" "}
-              {ruleset.rules.length === 1 ? "regulă" : "reguli"}
-            </span>
+            <Link href={`/s/${slug}/rules`}>
+              <Button variant="ghost" size="sm">
+                ← Reguli
+              </Button>
+            </Link>
+            <Link href={`/s/${slug}/attributes`}>
+              <Button variant="outline" size="sm">
+                Schema
+              </Button>
+            </Link>
           </div>
-        </div>
-        <Link href={`/s/${slug}/attributes`}>
-          <Button variant="outline" size="sm">
-            Schema clientului
-          </Button>
-        </Link>
-      </div>
+        }
+      />
 
       {!editable && (
-        <p className="rounded-md border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--muted)]">
+        <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-sm text-[var(--muted)]">
           Această versiune este <strong>{ruleset.status}</strong> și nu poate fi
-          modificată. Creează un draft din control plane pentru a face
-          schimbări — versiunile publicate rămân imuabile ca să poată fi
-          auditate și restaurate.
+          modificată.
         </p>
       )}
 
-      {[...byCategory.entries()].map(([category, rules]) => (
-        <section key={category} className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">
-            {category}{" "}
-            <span className="text-sm font-normal text-[var(--muted)]">
-              · în ordinea priorității
-            </span>
-          </h2>
+      <section className="panel flex flex-col gap-4 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-medium">Analiză și impact</h2>
+            <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">
+              Calculate de aplicație, fără model: constatările vin din compararea
+              condițiilor, iar impactul din reluarea evaluărilor reale cu fiecare
+              regulă scoasă pe rând.
+            </p>
+          </div>
+          <SimulateVersionButton
+            onSimulate={simulateVersion.bind(null, slug, version)}
+            disabled={version === liveVersion || history.length === 0}
+            disabledReason={
+              version === liveVersion
+                ? "Această versiune este cea publicată — este propria referință."
+                : "Nu există evaluări înregistrate pentru simulare."
+            }
+          />
+        </div>
 
-          <ul className="flex flex-col gap-3">
-            {rules.map((rule) => (
-              <li
-                key={rule.id}
-                className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4"
+        <FindingsList findings={analysis.findings} />
+
+        <ImpactTable
+          impacts={analysis.impacts}
+          sampleSize={analysis.replaySampleSize}
+        />
+
+        {analysis.impacts.length === 0 && (
+          <p className="text-sm text-[var(--muted)]">
+            Impactul nu a putut fi măsurat: nu există evaluări salvate pentru
+            acest magazin.
+          </p>
+        )}
+
+        {simulationMetrics && (
+          <div className="flex flex-col gap-2">
+            <SimulationTable simulation={simulationMetrics} />
+            {simulationNarrative && (
+              <div className="rounded border border-dashed border-[var(--border)] p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-wide">
+                  Explicație generată de model
+                </h3>
+                <p className="mt-1 whitespace-pre-wrap text-sm">
+                  {simulationNarrative}
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-[var(--muted)]">
+              Simulare din{" "}
+              {lastSimulation?.createdAt.toLocaleString("ro-RO") ?? "—"}. Nu
+              publică nimic — vezi{" "}
+              <Link
+                href={`/s/${slug}/rules/ai`}
+                className="underline underline-offset-2"
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-medium">
-                      {rule.name}{" "}
-                      <span className="text-sm text-[var(--muted)]">
-                        ({rule.key})
-                      </span>
-                    </p>
-                    <p className="text-sm text-[var(--muted)]">
-                      prioritate {rule.priority} ·{" "}
-                      {rule.enabled ? "activă" : "dezactivată"}
-                    </p>
-                    <p className="mt-1 text-sm">
-                      <span className="text-[var(--muted)]">dacă </span>
-                      {describeCondition(rule.conditions as Condition, schema)}
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-[var(--muted)]">atunci </span>
-                      {(rule.actions as Action[])
-                        .map((a) => a.type)
-                        .join(", ")}
-                    </p>
-                  </div>
+                asistentul AI
+              </Link>{" "}
+              pentru istoricul complet.
+            </p>
+          </div>
+        )}
+      </section>
 
-                  {editable && (
-                    <form
-                      action={async () => {
-                        "use server";
-                        await deleteRuleFromDraft(slug, version, rule.key);
-                      }}
-                    >
-                      <Button type="submit" variant="danger" size="sm">
-                        Șterge
-                      </Button>
-                    </form>
-                  )}
-                </div>
-
-                {editable && (
-                  <div className="mt-3">
-                    <RuleEditorPanel
-                      customFields={customFields}
-                      themeKeys={themeKeys}
-                      initial={{
-                        key: rule.key,
-                        name: rule.name,
-                        description: rule.description,
-                        category: rule.category,
-                        priority: rule.priority,
-                        enabled: rule.enabled,
-                        conditions: rule.conditions as Condition,
-                        actions: rule.actions as Action[],
-                      }}
-                      onSave={saveRuleInDraft.bind(null, slug, version)}
-                      openLabel="Editează în editorul vizual"
-                    />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      {ruleset.rules.length === 0 && (
-        <p className="rounded-lg border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
-          Această versiune nu are încă reguli.
-        </p>
-      )}
+      <RulesInVersionList
+        editable={editable}
+        customFields={customFields}
+        themeKeys={themeKeys}
+        rules={ruleset.rules.map((rule) => ({
+          id: rule.id,
+          key: rule.key,
+          name: rule.name,
+          description: rule.description,
+          category: rule.category as DecisionType,
+          priority: rule.priority,
+          enabled: rule.enabled,
+          conditions: rule.conditions as Condition,
+          actions: rule.actions as Action[],
+        }))}
+        onSave={saveRuleInDraft.bind(null, slug, version)}
+        onDelete={async (ruleKey) => {
+          "use server";
+          await deleteRuleFromDraft(slug, version, ruleKey);
+        }}
+      />
 
       {editable && (
         <section>
-          <h2 className="display mb-2 text-2xl">Adaugă regulă</h2>
+          <h2 className="mb-2 text-2xl font-semibold tracking-tight">
+            Adaugă regulă
+          </h2>
           <RuleEditorPanel
             customFields={customFields}
             themeKeys={themeKeys}

@@ -50,6 +50,35 @@ export function ThemePreview({
           fontFamily: "var(--font-body)",
         }}
       >
+        {tokens.heroImage && (
+          <div
+            className="relative h-24 overflow-hidden"
+            style={{ background: "var(--bg-deep)" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={tokens.heroImage}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div
+              className="absolute inset-0"
+              style={{ background: "var(--hero-overlay)" }}
+            />
+            <p
+              className="absolute bottom-2 left-3 text-white"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: tokens.displayWeight,
+                letterSpacing: `${tokens.displayTracking}em`,
+                fontSize: "1.1rem",
+              }}
+            >
+              {storeName}
+            </p>
+          </div>
+        )}
+
         <header
           className="flex items-center justify-between border-b px-4 py-3"
           style={{ borderColor: "var(--border)" }}

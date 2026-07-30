@@ -7,6 +7,7 @@ import {
   duplicateTheme,
   setDefaultTheme,
   updateTheme,
+  uploadThemeHeroImage,
 } from "@/app/actions/themes";
 import {
   ThemeManager,
@@ -97,7 +98,7 @@ export default async function ThemesPage({
         >
           ← Control plane
         </Link>
-        <h1 className="display mt-1 text-3xl">Teme</h1>
+        <h1 className="font-semibold tracking-tight mt-1 text-3xl">Teme</h1>
         <p className="mt-2 max-w-2xl text-[var(--muted)]">
           O temă este un set de valori de design, nu cod. Regulile de tip{" "}
           <strong>temă</strong> aleg una după cheie, iar magazinul o aplică
@@ -119,7 +120,7 @@ export default async function ThemesPage({
       </header>
 
       {orphanKeys.length > 0 && (
-        <p className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="rounded-[var(--radius)] border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Reguli selectează teme care nu există:{" "}
           <strong>{orphanKeys.join(", ")}</strong>. Clienții din acele grupuri
           primesc tema implicită. Creează temele lipsă sau corectează regulile.
@@ -137,6 +138,7 @@ export default async function ThemesPage({
           setDefault: setDefaultTheme.bind(null, slug),
           duplicate: duplicateTheme.bind(null, slug),
           remove: deleteTheme.bind(null, slug),
+          uploadHero: uploadThemeHeroImage.bind(null, slug),
         }}
       />
     </div>

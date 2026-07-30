@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -17,7 +17,6 @@ import {
 import {
   isGroupCondition,
   isNotCondition,
-  operatorLabel,
   type ComparisonOp,
   type Condition,
   type ContextSchema,
@@ -41,40 +40,38 @@ import {
 import { ValueInput } from "./value-input";
 
 /**
- * Nested block editor for a condition tree.
+ * Condition blocks for the Scratch-style board.
  *
- * Blocks nest visually the way the AST nests, so the shape on screen is the
- * shape that gets stored — there is no separate editor model to drift out of
- * sync with what the engine evaluates.
- *
- * Composition works three ways deliberately: drag from the palette, drag
- * existing blocks between groups, and per-block buttons. The buttons are not a
- * fallback for a broken drag implementation; they are the keyboard-and-
- * screen-reader path, which drag alone cannot provide.
+ * Palette lives on the left; mouths nest inside the Dacă C-block on the right.
  */
 
-const PALETTE_PREFIX = "field:";
-const BLOCK_PREFIX = "block:";
-const DROP_PREFIX = "drop:";
+export const PALETTE_PREFIX = "field:";
+export const STRUCT_PREFIX = "struct:";
+export const ACTION_PREFIX = "action:";
+export const BLOCK_PREFIX = "block:";
+export const DROP_PREFIX = "drop:";
+export const DROP_THEN_ID = "drop:then";
 
-export function ConditionTree({
+type StructKind = "and" | "or" | "not";
+
+export function ConditionDragRoot({
   value,
   onChange,
   schema,
   fieldsInScope,
-  errorsByPath,
+  onAddAction,
+  children,
 }: {
   value: Condition;
   onChange: (next: Condition) => void;
   schema: ContextSchema;
   fieldsInScope: FieldDef[];
-  errorsByPath: Map<string, string[]>;
+  onAddAction?: (actionType: string) => void;
+  children: ReactNode;
 }) {
   const [dragLabel, setDragLabel] = useState<string | null>(null);
 
   const sensors = useSensors(
-    // A small distance threshold keeps clicks on selects and inputs inside a
-    // block from being swallowed as drag starts.
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor),
   );
@@ -87,6 +84,21 @@ export function ConditionTree({
       setDragLabel(field?.label ?? path);
       return;
     }
+    if (id.startsWith(STRUCT_PREFIX)) {
+      const kind = id.slice(STRUCT_PREFIX.length) as StructKind;
+      setDragLabel(
+        kind === "and"
+          ? "Grup ȘI (toate)"
+          : kind === "or"
+            ? "Grup SAU (oricare)"
+            : "NU",
+      );
+      return;
+    }
+    if (id.startsWith(ACTION_PREFIX)) {
+      setDragLabel(String(event.active.data.current?.label ?? "Acțiune"));
+      return;
+    }
     if (id.startsWith(BLOCK_PREFIX)) {
       const blockPath = parsePath(id.slice(BLOCK_PREFIX.length));
       const node = getAt(value, blockPath);
@@ -97,16 +109,41 @@ export function ConditionTree({
   function handleDragEnd(event: DragEndEvent) {
     setDragLabel(null);
     const overId = event.over ? String(event.over.id) : null;
-    if (!overId || !overId.startsWith(DROP_PREFIX)) return;
+    if (!overId) return;
+
+    const activeId = String(event.active.id);
+
+    if (overId === DROP_THEN_ID && activeId.startsWith(ACTION_PREFIX)) {
+      onAddAction?.(activeId.slice(ACTION_PREFIX.length));
+      return;
+    }
+
+    if (!overId.startsWith(DROP_PREFIX) || overId === DROP_THEN_ID) return;
 
     const targetPath = parsePath(overId.slice(DROP_PREFIX.length));
-    const activeId = String(event.active.id);
 
     if (activeId.startsWith(PALETTE_PREFIX)) {
       const fieldPath = activeId.slice(PALETTE_PREFIX.length);
       const field = fieldsInScope.find((f) => f.path === fieldPath);
       if (!field) return;
       onChange(appendChild(value, targetPath, newComparison(field)));
+      return;
+    }
+
+    if (activeId.startsWith(STRUCT_PREFIX)) {
+      const kind = activeId.slice(STRUCT_PREFIX.length) as StructKind;
+      const firstField = fieldsInScope[0];
+      if (kind === "not") {
+        if (!firstField) return;
+        onChange(
+          appendChild(value, targetPath, {
+            op: "not",
+            child: newComparison(firstField),
+          }),
+        );
+        return;
+      }
+      onChange(appendChild(value, targetPath, { op: kind, children: [] }));
       return;
     }
 
@@ -124,30 +161,99 @@ export function ConditionTree({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setDragLabel(null)}
     >
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <Palette fields={fieldsInScope} />
-
-        <div className="rounded-lg bg-[#12161f] p-3 ring-1 ring-white/10">
-          <ConditionNode
-            node={value}
-            path={[]}
-            root={value}
-            onChange={onChange}
-            schema={schema}
-            fieldsInScope={fieldsInScope}
-            errorsByPath={errorsByPath}
-          />
-        </div>
-      </div>
-
+      {children}
       <DragOverlay dropAnimation={null}>
-        {dragLabel && (
-          <div className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-slate-900 shadow-lg">
-            {dragLabel}
-          </div>
-        )}
+        {dragLabel && <div className="rb-overlay">{dragLabel}</div>}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+export function ConditionPalette({ fields }: { fields: FieldDef[] }) {
+  const groups = groupFields(fields);
+
+  return (
+    <div className="rb-palette-section">
+      <p className="rb-palette-label">Logică</p>
+      <StructItem kind="and" label="ȘI · toate" />
+      <StructItem kind="or" label="SAU · oricare" />
+      <StructItem kind="not" label="NU" disabled={fields.length === 0} />
+
+      {groups.map((group) => (
+        <div key={group.label} className="rb-palette-group">
+          <p className="rb-palette-label">{group.label}</p>
+          {group.fields.map((field) => (
+            <PaletteItem key={field.path} field={field} />
+          ))}
+        </div>
+      ))}
+
+      {fields.length === 0 && (
+        <p className="text-xs text-[var(--warn)]">
+          Nicio variabilă pentru acest tip de decizie.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function ConditionMouth({
+  value,
+  onChange,
+  schema,
+  fieldsInScope,
+  errorsByPath,
+}: {
+  value: Condition;
+  onChange: (next: Condition) => void;
+  schema: ContextSchema;
+  fieldsInScope: FieldDef[];
+  errorsByPath: Map<string, string[]>;
+}) {
+  if (isGroupCondition(value)) {
+    return (
+      <RootMouth
+        node={value}
+        root={value}
+        onChange={onChange}
+        schema={schema}
+        fieldsInScope={fieldsInScope}
+        errorsByPath={errorsByPath}
+      />
+    );
+  }
+
+  return (
+    <ConditionNode
+      node={value}
+      path={[]}
+      root={value}
+      onChange={onChange}
+      schema={schema}
+      fieldsInScope={fieldsInScope}
+      errorsByPath={errorsByPath}
+    />
+  );
+}
+
+export function RootLogicToggle({
+  value,
+  onChange,
+}: {
+  value: Condition;
+  onChange: (next: Condition) => void;
+}) {
+  if (!isGroupCondition(value)) return null;
+  const isAnd = value.op === "and";
+  return (
+    <button
+      type="button"
+      onClick={() => onChange({ ...value, op: isAnd ? "or" : "and" })}
+      className={`rb-chip ${isAnd ? "rb-chip--and" : "rb-chip--or"}`}
+      title="Comută între toate (ȘI) / oricare (SAU)"
+    >
+      {isAnd ? "toate · ȘI" : "oricare · SAU"}
+    </button>
   );
 }
 
@@ -164,44 +270,39 @@ function newComparison(field: FieldDef): Condition {
     : { op, path: field.path, value };
 }
 
-// ---------------------------------------------------------------------------
-// Palette
-// ---------------------------------------------------------------------------
-
-function Palette({ fields }: { fields: FieldDef[] }) {
-  const groups = groupFields(fields);
+function StructItem({
+  kind,
+  label,
+  disabled,
+}: {
+  kind: StructKind;
+  label: string;
+  disabled?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${STRUCT_PREFIX}${kind}`,
+    disabled,
+  });
 
   return (
-    <aside className="flex flex-col gap-3 rounded-lg bg-[#12161f] p-3 ring-1 ring-white/10">
-      <p className="text-xs font-medium uppercase tracking-wide text-white/40">
-        Variabile
-      </p>
-      <p className="text-xs text-white/40">
-        Trage o variabilă într-un grup, sau folosește „+ condiție”.
-      </p>
-
-      {groups.map((group) => (
-        <div key={group.label} className="flex flex-col gap-1.5">
-          <p className="text-xs font-medium text-white/60">{group.label}</p>
-          {group.fields.map((field) => (
-            <PaletteItem key={field.path} field={field} />
-          ))}
-        </div>
-      ))}
-
-      {fields.length === 0 && (
-        <p className="text-xs text-amber-300/80">
-          Nicio variabilă disponibilă pentru acest tip de decizie.
-        </p>
-      )}
-    </aside>
+    <button
+      type="button"
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      disabled={disabled}
+      data-dragging={isDragging || undefined}
+      className={`rb-brick rb-brick--logic-${kind}`}
+    >
+      {label}
+    </button>
   );
 }
 
 function PaletteItem({ field }: { field: FieldDef }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggableBlock(
-    `${PALETTE_PREFIX}${field.path}`,
-  );
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `${PALETTE_PREFIX}${field.path}`,
+  });
 
   const custom = field.source === "custom";
 
@@ -212,31 +313,113 @@ function PaletteItem({ field }: { field: FieldDef }) {
       {...listeners}
       {...attributes}
       title={`${field.path} · ${field.type}`}
-      className={
-        "cursor-grab rounded border px-2 py-1 text-left text-xs transition " +
-        (custom
-          ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100 hover:border-emerald-300/70"
-          : "border-white/15 bg-white/5 text-white/80 hover:border-white/35") +
-        (isDragging ? " opacity-40" : "")
-      }
+      data-dragging={isDragging || undefined}
+      className={`rb-brick ${custom ? "rb-brick--custom" : "rb-brick--field"}`}
     >
       <span className="block truncate">{field.label}</span>
-      <span className="block truncate text-[10px] text-white/35">
-        {field.type}
-      </span>
+      <span className="rb-brick-sub truncate">{field.type}</span>
     </button>
   );
 }
 
-/** Thin wrapper so blocks and palette items share one drag setup. */
-function useDraggableBlock(id: string) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
-  return { attributes, listeners, setNodeRef, isDragging };
-}
+function RootMouth({
+  node,
+  root,
+  onChange,
+  schema,
+  fieldsInScope,
+  errorsByPath,
+}: {
+  node: Extract<Condition, { children: Condition[] }>;
+  root: Condition;
+  onChange: (next: Condition) => void;
+  schema: ContextSchema;
+  fieldsInScope: FieldDef[];
+  errorsByPath: Map<string, string[]>;
+}) {
+  const path: BlockPath = [];
+  const key = pathKey(path);
+  const { setNodeRef, isOver } = useDroppable({ id: `${DROP_PREFIX}${key}` });
+  const errors = errorsByPath.get(key) ?? [];
+  const firstField = fieldsInScope[0];
 
-// ---------------------------------------------------------------------------
-// Blocks
-// ---------------------------------------------------------------------------
+  return (
+    <div
+      ref={setNodeRef}
+      data-over={isOver || undefined}
+      className="rb-mouth rb-mouth--root"
+    >
+      {errors.length > 0 && (
+        <ul className="rb-block-errors" style={{ paddingLeft: 0 }}>
+          {errors.map((error, i) => (
+            <li key={i} className="rb-block-error">
+              {error}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {node.children.map((child, index) => (
+        <ConditionNode
+          key={index}
+          node={child}
+          path={[index]}
+          root={root}
+          onChange={onChange}
+          schema={schema}
+          fieldsInScope={fieldsInScope}
+          errorsByPath={errorsByPath}
+        />
+      ))}
+
+      {node.children.length === 0 && (
+        <p className="rb-slot" data-over={isOver || undefined}>
+          Trage condiții sau logică aici
+        </p>
+      )}
+
+      <div className="rb-add-row">
+        <AddButton
+          disabled={!firstField}
+          onClick={() =>
+            firstField &&
+            onChange(appendChild(root, path, newComparison(firstField)))
+          }
+        >
+          + condiție
+        </AddButton>
+        <AddButton
+          onClick={() =>
+            onChange(appendChild(root, path, { op: "and", children: [] }))
+          }
+        >
+          + grup ȘI
+        </AddButton>
+        <AddButton
+          onClick={() =>
+            onChange(appendChild(root, path, { op: "or", children: [] }))
+          }
+        >
+          + grup SAU
+        </AddButton>
+        <AddButton
+          disabled={!firstField}
+          onClick={() =>
+            firstField &&
+            onChange(
+              appendChild(root, path, {
+                op: "not",
+                child: newComparison(firstField),
+              }),
+            )
+          }
+        >
+          + NU
+        </AddButton>
+      </div>
+    </div>
+  );
+}
 
 function ConditionNode(props: {
   node: Condition;
@@ -258,52 +441,67 @@ function BlockControls({
   root,
   onChange,
   canWrap = true,
+  leading,
 }: {
   path: BlockPath;
   root: Condition;
   onChange: (next: Condition) => void;
   canWrap?: boolean;
+  leading?: ReactNode;
 }) {
   const isRoot = path.length === 0;
-  if (isRoot) return null;
+  if (isRoot && !leading) return null;
 
   const parentPath = path.slice(0, -1);
   const index = path[path.length - 1]!;
   const parent = getAt(root, parentPath);
-  const siblingCount = parent && isGroupCondition(parent) ? parent.children.length : 1;
+  const siblingCount =
+    parent && isGroupCondition(parent) ? parent.children.length : 1;
   const node = getAt(root, path);
 
   return (
-    <div className="ml-auto flex shrink-0 items-center gap-1">
-      {siblingCount > 1 && (
+    <div className="rb-controls">
+      {leading}
+      {!isRoot && siblingCount > 1 && (
         <>
           <IconButton
             label="Mută mai sus"
             disabled={index === 0}
-            onClick={() => onChange(moveChild(root, parentPath, index, index - 1))}
+            onClick={() =>
+              onChange(moveChild(root, parentPath, index, index - 1))
+            }
           >
             ↑
           </IconButton>
           <IconButton
             label="Mută mai jos"
             disabled={index === siblingCount - 1}
-            onClick={() => onChange(moveChild(root, parentPath, index, index + 1))}
+            onClick={() =>
+              onChange(moveChild(root, parentPath, index, index + 1))
+            }
           >
             ↓
           </IconButton>
         </>
       )}
-      {canWrap && node && (
+      {!isRoot && canWrap && node && (
         <IconButton
           label="Încadrează în NU"
-          onClick={() => onChange(replaceAt(root, path, { op: "not", child: node }))}
+          onClick={() =>
+            onChange(replaceAt(root, path, { op: "not", child: node }))
+          }
         >
           NU
         </IconButton>
       )}
-      <IconButton label="Șterge blocul" onClick={() => onChange(removeAt(root, path))}>
-        ×
-      </IconButton>
+      {!isRoot && (
+        <IconButton
+          label="Șterge blocul"
+          onClick={() => onChange(removeAt(root, path))}
+        >
+          ×
+        </IconButton>
+      )}
     </div>
   );
 }
@@ -314,7 +512,7 @@ function IconButton({
   onClick,
   disabled,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
@@ -326,7 +524,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded px-1.5 py-0.5 text-xs text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-25 disabled:hover:bg-transparent"
+      className="rb-icon-btn"
     >
       {children}
     </button>
@@ -354,35 +552,25 @@ function GroupBlock({
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `${DROP_PREFIX}${key}`,
   });
-  const drag = useDraggableBlock(`${BLOCK_PREFIX}${key}`);
+  const drag = useDraggable({ id: `${BLOCK_PREFIX}${key}` });
   const errors = errorsByPath.get(key) ?? [];
 
   const isAnd = node.op === "and";
-  const accent = isAnd
-    ? "border-indigo-400/50 bg-indigo-500/10"
-    : "border-amber-400/50 bg-amber-500/10";
-  const chip = isAnd
-    ? "bg-indigo-400/25 text-indigo-100"
-    : "bg-amber-400/25 text-amber-100";
-
   const firstField = fieldsInScope[0];
 
   return (
     <div
       ref={setDropRef}
-      className={
-        "rounded-lg border-2 p-2 transition " +
-        accent +
-        (isOver ? " ring-2 ring-white/50" : "")
-      }
+      data-over={isOver || undefined}
+      className={`rb-block ${isAnd ? "rb-block--and" : "rb-block--or"}`}
     >
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="rb-block-head">
         {path.length > 0 && (
           <span
             ref={drag.setNodeRef}
             {...drag.listeners}
             {...drag.attributes}
-            className="cursor-grab select-none px-1 text-white/35"
+            className="rb-grip"
             aria-label="Trage grupul"
             role="button"
             tabIndex={0}
@@ -391,39 +579,33 @@ function GroupBlock({
           </span>
         )}
 
-        {/* Toggling the connector rewrites the whole group's logic, so it reads
-            as a switch rather than a label. */}
         <button
           type="button"
           onClick={() =>
-            onChange(replaceAt(root, path, { ...node, op: isAnd ? "or" : "and" }))
+            onChange(
+              replaceAt(root, path, { ...node, op: isAnd ? "or" : "and" }),
+            )
           }
-          className={`rounded px-2 py-0.5 text-xs font-semibold ${chip}`}
+          className={`rb-chip ${isAnd ? "rb-chip--and" : "rb-chip--or"}`}
           title="Comută între ȘI / SAU"
         >
-          {isAnd ? "ȘI" : "SAU"}
+          {isAnd ? "ȘI · toate" : "SAU · oricare"}
         </button>
-
-        <span className="text-xs text-white/40">
-          {isAnd
-            ? "toate condițiile trebuie îndeplinite"
-            : "cel puțin o condiție"}
-        </span>
 
         <BlockControls path={path} root={root} onChange={onChange} />
       </div>
 
       {errors.length > 0 && (
-        <ul className="mt-1.5 flex flex-col gap-0.5">
+        <ul className="rb-block-errors" style={{ paddingLeft: 0 }}>
           {errors.map((error, i) => (
-            <li key={i} className="text-xs text-rose-300">
+            <li key={i} className="rb-block-error">
               {error}
             </li>
           ))}
         </ul>
       )}
 
-      <div className="mt-2 flex flex-col gap-2 pl-3">
+      <div className="rb-mouth">
         {node.children.map((child, index) => (
           <ConditionNode
             key={index}
@@ -438,12 +620,12 @@ function GroupBlock({
         ))}
 
         {node.children.length === 0 && (
-          <p className="rounded border border-dashed border-white/20 px-2 py-3 text-center text-xs text-white/35">
-            Trage o variabilă aici
+          <p className="rb-slot" data-over={isOver || undefined}>
+            Trage un bloc aici
           </p>
         )}
 
-        <div className="flex flex-wrap gap-1.5">
+        <div className="rb-add-row">
           <AddButton
             disabled={!firstField}
             onClick={() =>
@@ -485,7 +667,7 @@ function AddButton({
   onClick,
   disabled,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -494,7 +676,7 @@ function AddButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded border border-white/20 bg-white/5 px-2 py-0.5 text-xs text-white/70 transition hover:border-white/40 hover:text-white disabled:opacity-30"
+      className="rb-add-btn"
     >
       {children}
     </button>
@@ -519,46 +701,41 @@ function NotBlock({
   errorsByPath: Map<string, string[]>;
 }) {
   const key = pathKey(path);
-  const drag = useDraggableBlock(`${BLOCK_PREFIX}${key}`);
+  const drag = useDraggable({ id: `${BLOCK_PREFIX}${key}` });
 
   return (
-    <div className="rounded-lg border-2 border-rose-400/50 bg-rose-500/10 p-2">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="rb-block rb-block--not">
+      <div className="rb-block-head">
         <span
           ref={drag.setNodeRef}
           {...drag.listeners}
           {...drag.attributes}
-          className="cursor-grab select-none px-1 text-white/35"
+          className="rb-grip"
           aria-label="Trage blocul"
           role="button"
           tabIndex={0}
         >
           ⠿
         </span>
-        <span className="rounded bg-rose-400/25 px-2 py-0.5 text-xs font-semibold text-rose-100">
-          NU
-        </span>
-        <span className="text-xs text-white/40">condiția de mai jos e falsă</span>
+        <span className="rb-chip rb-chip--not">NU</span>
 
-        {/* Unwrapping is offered here instead of the generic "wrap in NOT",
-            since wrapping a NOT in another NOT is never what an author wants. */}
-        <div className="ml-auto flex items-center gap-1">
-          <IconButton
-            label="Elimină negația"
-            onClick={() => onChange(replaceAt(root, path, node.child))}
-          >
-            ⤴
-          </IconButton>
-          <BlockControls
-            path={path}
-            root={root}
-            onChange={onChange}
-            canWrap={false}
-          />
-        </div>
+        <BlockControls
+          path={path}
+          root={root}
+          onChange={onChange}
+          canWrap={false}
+          leading={
+            <IconButton
+              label="Elimină negația"
+              onClick={() => onChange(replaceAt(root, path, node.child))}
+            >
+              ⤴
+            </IconButton>
+          }
+        />
       </div>
 
-      <div className="mt-2 pl-3">
+      <div className="rb-mouth">
         <ConditionNode
           node={node.child}
           path={[...path, 0]}
@@ -590,18 +767,18 @@ function ComparisonBlock({
   errorsByPath: Map<string, string[]>;
 }) {
   const key = pathKey(path);
-  const drag = useDraggableBlock(`${BLOCK_PREFIX}${key}`);
+  const drag = useDraggable({ id: `${BLOCK_PREFIX}${key}` });
   const errors = errorsByPath.get(key) ?? [];
 
   const field = fieldsInScope.find((f) => f.path === node.path);
   const custom = field?.source === "custom";
   const unknown = !field;
 
-  const border = unknown
-    ? "border-rose-400/60 bg-rose-500/10"
+  const tone = unknown
+    ? "rb-block--compare-error"
     : custom
-      ? "border-emerald-400/50 bg-emerald-500/10"
-      : "border-sky-400/40 bg-sky-500/10";
+      ? "rb-block--compare-custom"
+      : "rb-block--compare";
 
   function update(next: Partial<Extract<Condition, { path: string }>>) {
     onChange(replaceAt(root, path, { ...node, ...next } as Condition));
@@ -610,8 +787,6 @@ function ComparisonBlock({
   function changeField(nextPath: string) {
     const nextField = fieldsInScope.find((f) => f.path === nextPath);
     if (!nextField) return;
-    // Both the operator and the value may be invalid for the new type, so they
-    // are re-derived rather than carried across.
     const op = coerceOperator(nextField.type, node.op);
     const value = defaultValueFor(nextField, op);
     onChange(
@@ -638,17 +813,14 @@ function ComparisonBlock({
     );
   }
 
-  const selectClass =
-    "rounded border border-white/15 bg-black/30 px-2 py-1 text-sm text-white outline-none focus:border-white/40";
-
   return (
-    <div className={"rounded-lg border-2 p-2 " + border}>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className={`rb-block ${tone}`}>
+      <div className="rb-block-head">
         <span
           ref={drag.setNodeRef}
           {...drag.listeners}
           {...drag.attributes}
-          className="cursor-grab select-none px-1 text-white/35"
+          className="rb-grip"
           aria-label="Trage condiția"
           role="button"
           tabIndex={0}
@@ -658,7 +830,7 @@ function ComparisonBlock({
 
         <select
           aria-label="Variabilă"
-          className={selectClass}
+          className="rb-reporter"
           value={node.path}
           onChange={(e) => changeField(e.target.value)}
         >
@@ -678,7 +850,7 @@ function ComparisonBlock({
 
         <select
           aria-label="Operator"
-          className={selectClass}
+          className="rb-reporter"
           value={node.op}
           onChange={(e) => changeOperator(e.target.value as ComparisonOp)}
         >
@@ -699,7 +871,9 @@ function ComparisonBlock({
           value={node.value}
           onChange={(value) =>
             value === undefined
-              ? onChange(replaceAt(root, path, { op: node.op, path: node.path }))
+              ? onChange(
+                  replaceAt(root, path, { op: node.op, path: node.path }),
+                )
               : update({ value })
           }
         />
@@ -708,16 +882,15 @@ function ComparisonBlock({
       </div>
 
       {field?.type && (
-        <p className="mt-1 pl-6 text-[10px] text-white/30">
+        <p className="rb-block-meta">
           {field.path} · {field.type}
-          {field.description ? ` · ${field.description}` : ""}
         </p>
       )}
 
       {errors.length > 0 && (
-        <ul className="mt-1 flex flex-col gap-0.5 pl-6">
+        <ul className="rb-block-errors">
           {errors.map((error, i) => (
-            <li key={i} className="text-xs text-rose-300">
+            <li key={i} className="rb-block-error">
               {error}
             </li>
           ))}

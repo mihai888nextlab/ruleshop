@@ -43,6 +43,7 @@ export function ThemeEditor({
   isNew,
   onSave,
   onCancel,
+  onUploadHero,
 }: {
   initialKey: string;
   initialName: string;
@@ -54,6 +55,8 @@ export function ThemeEditor({
     tokens: ThemeTokens;
   }) => Promise<unknown>;
   onCancel?: () => void;
+  /** Uploads via FormData (`image` file field) and returns `/uploads/...`. */
+  onUploadHero: (formData: FormData) => Promise<string>;
 }) {
   const [key, setKey] = useState(initialKey);
   const [name, setName] = useState(initialName);
@@ -61,6 +64,8 @@ export function ThemeEditor({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
 
   function patch(next: Partial<ThemeTokens>) {
     setSaved(false);
@@ -73,6 +78,27 @@ export function ThemeEditor({
       ...current,
       colors: { ...current.colors, [colorKey]: value },
     }));
+  }
+
+  async function onHeroFile(file: File | undefined) {
+    if (!file) return;
+    setError("");
+    setUploading(true);
+    setLocalPreview(URL.createObjectURL(file));
+    try {
+      const fd = new FormData();
+      fd.set("image", file);
+      const path = await onUploadHero(fd);
+      patch({ heroImage: path });
+      setLocalPreview(null);
+    } catch (cause) {
+      setLocalPreview(null);
+      setError(
+        cause instanceof Error ? cause.message : "Încărcarea imaginii a eșuat",
+      );
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function save() {
@@ -89,6 +115,7 @@ export function ThemeEditor({
   }
 
   const labelClass = "flex flex-col gap-1 text-sm";
+  const heroSrc = localPreview ?? tokens.heroImage;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
@@ -120,6 +147,62 @@ export function ThemeEditor({
             </span>
           </label>
         </div>
+
+        <section className="flex flex-col gap-3">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            Hero catalog
+          </h3>
+          <p className="text-xs text-[var(--muted)]">
+            Imaginea de pe prima pagină a magazinului. Fără imagine, hero-ul
+            rămâne mineral (doar culori).
+          </p>
+          {heroSrc && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={heroSrc}
+              alt=""
+              className="h-28 w-full rounded-[var(--radius)] border border-[var(--border)] object-cover"
+            />
+          )}
+          <Input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            disabled={uploading || pending}
+            onChange={(event) => {
+              void onHeroFile(event.target.files?.[0]);
+              event.target.value = "";
+            }}
+          />
+          {tokens.heroImage && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="self-start"
+              disabled={uploading || pending}
+              onClick={() => {
+                setLocalPreview(null);
+                patch({ heroImage: null });
+              }}
+            >
+              Elimină imaginea
+            </Button>
+          )}
+          {uploading && (
+            <p className="text-xs text-[var(--muted)]">Se încarcă…</p>
+          )}
+          <RangeRow
+            label="Întunecare pe imagine"
+            value={tokens.heroOverlay}
+            min={0}
+            max={1}
+            step={0.05}
+            display={`${Math.round(tokens.heroOverlay * 100)}%`}
+            onChange={(value) =>
+              patch({ heroOverlay: Number(value.toFixed(2)) })
+            }
+          />
+        </section>
 
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -155,7 +238,7 @@ export function ThemeEditor({
                     .value as ThemeTokens["fontDisplay"],
                 })
               }
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
             >
               {Object.entries(DISPLAY_FONTS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -172,7 +255,7 @@ export function ThemeEditor({
               onChange={(event) =>
                 patch({ fontBody: event.target.value as ThemeTokens["fontBody"] })
               }
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+              className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
             >
               {Object.entries(BODY_FONTS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -231,7 +314,7 @@ export function ThemeEditor({
                   type="button"
                   onClick={() => patch({ density: option })}
                   className={
-                    "rounded-md border px-3 py-1.5 text-xs transition " +
+                    "rounded-[var(--radius)] border px-3 py-1.5 text-xs transition " +
                     (tokens.density === option
                       ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-fg)]"
                       : "border-[var(--border)] hover:border-[var(--accent)]")
@@ -247,14 +330,14 @@ export function ThemeEditor({
         {error && (
           <p
             role="alert"
-            className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+            className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
           >
             {error}
           </p>
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" onClick={save} disabled={pending}>
+          <Button type="button" onClick={save} disabled={pending || uploading}>
             {pending ? "Se salvează…" : isNew ? "Creează tema" : "Salvează"}
           </Button>
           {onCancel && (
@@ -270,7 +353,6 @@ export function ThemeEditor({
         </div>
       </div>
 
-      {/* Rendered with the same variables the storefront applies. */}
       <div className="lg:sticky lg:top-6">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
           Previzualizare
@@ -302,8 +384,6 @@ function ColorRow({
 }) {
   return (
     <label className="flex items-center gap-3 text-sm">
-      {/* Native colour input for picking, plus a hex field so an exact brand
-          value can be pasted rather than hunted for. */}
       <input
         type="color"
         value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000"}
@@ -317,7 +397,7 @@ function ColorRow({
         onChange={(event) => onChange(event.target.value)}
         spellCheck={false}
         maxLength={7}
-        className="w-24 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs"
+        className="w-24 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 font-mono text-xs"
       />
     </label>
   );

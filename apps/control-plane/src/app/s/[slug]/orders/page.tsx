@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 import { formatRon } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { StorefrontChrome } from "@/components/storefront-chrome";
 
 export default async function OrdersPage({
   params,
@@ -19,7 +20,7 @@ export default async function OrdersPage({
   if (!session?.user) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="display text-3xl">Comenzile mele</h1>
+        <h1 className="font-semibold tracking-tight text-3xl">Comenzile mele</h1>
         <p className="text-sm text-[var(--muted)]">
           <Link href={`/login?next=/s/${slug}/orders`} className="underline">
             Autentifică-te
@@ -36,8 +37,9 @@ export default async function OrdersPage({
   });
 
   return (
+    <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="flex flex-col gap-4">
-      <h1 className="display text-3xl">Comenzile mele</h1>
+      <h1 className="font-semibold tracking-tight text-3xl">Comenzile mele</h1>
       {orders.length === 0 ? (
         <p className="text-[var(--muted)]">Nicio comandă.</p>
       ) : (
@@ -46,7 +48,7 @@ export default async function OrdersPage({
             <li key={o.id}>
               <Link
                 href={`/s/${slug}/orders/${o.id}`}
-                className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4"
+                className="flex items-center justify-between rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4"
               >
                 <div>
                   <p className="font-medium">{o.id.slice(0, 8)}…</p>
@@ -64,5 +66,6 @@ export default async function OrdersPage({
         </ul>
       )}
     </div>
+    </StorefrontChrome>
   );
 }

@@ -107,6 +107,22 @@ export const themeTokensSchema = z.object({
   productRatio: z.enum(["3 / 4", "1 / 1", "4 / 5"]),
   /** How strongly hero imagery is darkened, 0 to 1. */
   heroOverlay: z.number().min(0).max(1),
+  /**
+   * Catalog hero photo. Only local upload paths are accepted — never a free URL —
+   * so a theme cannot point the storefront at an arbitrary remote resource.
+   */
+  heroImage: z
+    .union([
+      z.null(),
+      z
+        .string()
+        .regex(
+          /^\/(?:uploads\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+|products\/[a-zA-Z0-9._-]+)$/,
+          "cale invalidă pentru imaginea hero",
+        ),
+    ])
+    .optional()
+    .default(null),
 });
 
 export type ThemeTokens = z.infer<typeof themeTokensSchema>;
@@ -167,6 +183,7 @@ export const DEFAULT_THEME_TOKENS: ThemeTokens = {
   density: "regular",
   productRatio: "3 / 4",
   heroOverlay: 0.72,
+  heroImage: null,
 };
 
 const DENSITY_SCALE: Record<ThemeTokens["density"], string> = {

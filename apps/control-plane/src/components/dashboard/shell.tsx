@@ -3,18 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   Boxes,
   ClipboardList,
   FlaskConical,
   GitCompare,
   LayoutDashboard,
+  Palette,
   ScrollText,
   Shield,
   Sparkles,
   Store,
   Tags,
   Workflow,
-  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,22 @@ export type DashNavItem = {
   label: string;
   icon?: React.ReactNode;
   exact?: boolean;
+  /** Custom active matcher when path prefixes would collide (e.g. /rules vs /rules/test). */
+  match?: (pathname: string) => boolean;
 };
+
+type NavSection = {
+  id: string;
+  label: string;
+  items: DashNavItem[];
+};
+
+function isActive(pathname: string, item: DashNavItem): boolean {
+  if (item.match) return item.match(pathname);
+  return item.exact
+    ? pathname === item.href
+    : pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
 
 function NavList({ items }: { items: DashNavItem[] }) {
   const pathname = usePathname();
@@ -31,10 +47,7 @@ function NavList({ items }: { items: DashNavItem[] }) {
   return (
     <nav className="flex flex-col gap-0.5">
       {items.map((item) => {
-        const active = item.exact
-          ? pathname === item.href
-          : pathname === item.href || pathname.startsWith(`${item.href}/`);
-
+        const active = isActive(pathname, item);
         return (
           <Link
             key={item.href}
@@ -42,7 +55,7 @@ function NavList({ items }: { items: DashNavItem[] }) {
             data-active={active}
             className="dash-nav-link"
           >
-            <span className="opacity-80">{item.icon}</span>
+            <span className="dash-nav-icon">{item.icon}</span>
             {item.label}
           </Link>
         );
@@ -50,6 +63,113 @@ function NavList({ items }: { items: DashNavItem[] }) {
     </nav>
   );
 }
+
+function storeSections(storeSlug: string): NavSection[] {
+  return [
+    {
+      id: "magazin",
+      label: "Magazin",
+      items: [
+        {
+          href: `/s/${storeSlug}/admin`,
+          label: "Overview",
+          icon: <LayoutDashboard size={15} />,
+          exact: true,
+        },
+        {
+          href: `/s/${storeSlug}/admin/products`,
+          label: "Produse",
+          icon: <Boxes size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/admin/orders`,
+          label: "Comenzi",
+          icon: <ClipboardList size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/admin/analytics`,
+          label: "Analitică",
+          icon: <BarChart3 size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/admin/connection`,
+          label: "Conexiune",
+          icon: <Store size={15} />,
+        },
+      ],
+    },
+    {
+      id: "decizii",
+      label: "Decizii",
+      items: [
+        {
+          href: `/s/${storeSlug}/rules`,
+          label: "Reguli",
+          icon: <Workflow size={15} />,
+          match: (pathname) =>
+            pathname === `/s/${storeSlug}/rules` ||
+            /^\/s\/[^/]+\/rules\/\d+(\/.*)?$/.test(pathname),
+        },
+        {
+          href: `/s/${storeSlug}/attributes`,
+          label: "Schema",
+          icon: <Tags size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/themes`,
+          label: "Teme",
+          icon: <Palette size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/rules/evaluations`,
+          label: "Evaluări",
+          icon: <ScrollText size={15} />,
+        },
+      ],
+    },
+    {
+      id: "laborator",
+      label: "Laborator",
+      items: [
+        {
+          href: `/s/${storeSlug}/rules/test`,
+          label: "Test harness",
+          icon: <FlaskConical size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/rules/diff`,
+          label: "Diff",
+          icon: <GitCompare size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/rules/ai`,
+          label: "AI",
+          icon: <Sparkles size={15} />,
+        },
+        {
+          href: `/s/${storeSlug}/rules/audit`,
+          label: "Audit",
+          icon: <Shield size={15} />,
+        },
+      ],
+    },
+  ];
+}
+
+const platformSections: NavSection[] = [
+  {
+    id: "platform",
+    label: "Platformă",
+    items: [
+      {
+        href: "/platform",
+        label: "Magazine",
+        icon: <LayoutDashboard size={15} />,
+        exact: true,
+      },
+    ],
+  },
+];
 
 export function DashboardShell({
   title,
@@ -64,125 +184,62 @@ export function DashboardShell({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
-  const primary: DashNavItem[] = storeSlug
+  const pathname = usePathname();
+  const sections = storeSlug ? storeSections(storeSlug) : platformSections;
+  const mobileItems = storeSlug
     ? [
-        {
-          href: `/s/${storeSlug}/admin`,
-          label: "Overview",
-          icon: <LayoutDashboard size={16} />,
-          exact: true,
-        },
-        {
-          href: `/s/${storeSlug}/rules`,
-          label: "Reguli",
-          icon: <Workflow size={16} />,
-          exact: true,
-        },
-        {
-          href: `/s/${storeSlug}/attributes`,
-          label: "Schema",
-          icon: <Tags size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/themes`,
-          label: "Teme",
-          icon: <Palette size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/admin/products`,
-          label: "Produse",
-          icon: <Boxes size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/admin/orders`,
-          label: "Comenzi",
-          icon: <ClipboardList size={16} />,
-        },
+        ...sections[0]!.items,
+        ...sections[1]!.items,
       ]
-    : [
-        {
-          href: "/platform",
-          label: "Magazine",
-          icon: <LayoutDashboard size={16} />,
-          exact: true,
-        },
-      ];
-
-  const secondary: DashNavItem[] = storeSlug
-    ? [
-        {
-          href: `/s/${storeSlug}/rules/test`,
-          label: "Test harness",
-          icon: <FlaskConical size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/rules/evaluations`,
-          label: "Evaluări",
-          icon: <ScrollText size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/rules/diff`,
-          label: "Diff",
-          icon: <GitCompare size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/rules/audit`,
-          label: "Audit",
-          icon: <Shield size={16} />,
-        },
-        {
-          href: `/s/${storeSlug}/rules/ai`,
-          label: "AI",
-          icon: <Sparkles size={16} />,
-        },
-      ]
-    : [];
+    : sections.flatMap((s) => s.items);
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-[var(--sidebar)] px-3 py-4 text-[var(--sidebar-fg)] md:flex">
-        <div className="px-2 pb-5">
-          <Link href="/" className="display text-lg tracking-tight">
+    <div className="flex min-h-screen bg-[var(--bg)]">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-white/10 bg-[var(--sidebar)] px-2.5 py-4 text-[var(--sidebar-fg)] md:flex">
+        <div className="px-2 pb-4">
+          <Link href="/" className="text-[15px] font-semibold tracking-tight">
             RuleShop
           </Link>
-          <p className="mt-1 text-[0.7rem] uppercase tracking-[0.16em] text-[var(--sidebar-muted)]">
+          <p className="mt-0.5 text-xs text-[var(--sidebar-muted)]">
             Control plane
           </p>
         </div>
 
-        <div className="px-2 pb-3">
-          <p className="display text-base leading-tight">{title}</p>
+        <div className="border-b border-white/10 px-2 pb-3">
+          <p className="text-sm font-medium leading-tight">{title}</p>
           {subtitle && (
-            <p className="mt-1 text-xs text-[var(--sidebar-muted)]">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-[var(--sidebar-muted)]">
+              {subtitle}
+            </p>
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-0.5">
-          <p className="mb-1 px-2 text-[0.65rem] uppercase tracking-[0.14em] text-[var(--sidebar-muted)]">
-            Principal
-          </p>
-          <NavList items={primary} />
-
-          {secondary.length > 0 && (
-            <>
-              <p className="mb-1 mt-5 px-2 text-[0.65rem] uppercase tracking-[0.14em] text-[var(--sidebar-muted)]">
-                Instrumente
-              </p>
-              <NavList items={secondary} />
-            </>
-          )}
+        <div className="mt-3 flex-1 overflow-y-auto px-0.5">
+          {sections.map((section, index) => (
+            <div
+              key={section.id}
+              className={index === 0 ? undefined : "mt-5"}
+            >
+              <p className="dash-nav-section">{section.label}</p>
+              <NavList items={section.items} />
+            </div>
+          ))}
         </div>
 
-        <div className="mt-4 space-y-1 border-t border-white/10 px-0.5 pt-3">
+        <div className="mt-3 space-y-0.5 border-t border-white/10 px-0.5 pt-3">
           {storeSlug && (
             <Link href={`/s/${storeSlug}`} className="dash-nav-link">
-              <Store size={16} />
+              <span className="dash-nav-icon">
+                <Store size={15} />
+              </span>
               Magazin live
             </Link>
           )}
           {!storeSlug && (
             <Link href="/" className="dash-nav-link">
-              <Store size={16} />
+              <span className="dash-nav-icon">
+                <Store size={15} />
+              </span>
               Acasă
             </Link>
           )}
@@ -191,10 +248,10 @@ export function DashboardShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur md:hidden">
+        <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--surface)] md:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div>
-              <p className="display text-base">{title}</p>
+              <p className="text-sm font-semibold">{title}</p>
               {subtitle && (
                 <p className="text-xs text-[var(--muted)]">{subtitle}</p>
               )}
@@ -204,22 +261,28 @@ export function DashboardShell({
             </Link>
           </div>
           <div className="flex gap-1 overflow-x-auto px-3 pb-3">
-            {primary.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "shrink-0 rounded-full border border-[var(--border)] px-3 py-1 text-xs",
-                  "hover:border-[var(--accent)]",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {mobileItems.map((item) => {
+              const active = isActive(pathname, item);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  data-active={active}
+                  className={cn(
+                    "shrink-0 rounded-[var(--radius)] border px-2.5 py-1 text-xs",
+                    active
+                      ? "border-[var(--fg)] bg-[var(--fg)] text-[var(--accent-fg)]"
+                      : "border-[var(--border)] hover:bg-[var(--surface-2)]",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:px-6">
           {children}
         </main>
       </div>
@@ -228,27 +291,17 @@ export function DashboardShell({
 }
 
 export function PageHeader({
-  eyebrow,
   title,
-  description,
   actions,
 }: {
-  eyebrow?: string;
   title: string;
-  description?: string;
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div className="max-w-2xl">
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1 className="display mt-2 text-3xl sm:text-4xl">{title}</h1>
-        {description && (
-          <p className="mt-2 text-sm text-[var(--muted)] sm:text-base">
-            {description}
-          </p>
-        )}
-      </div>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border)] pb-5">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        {title}
+      </h1>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
   );
@@ -257,17 +310,16 @@ export function PageHeader({
 export function StatCard({
   label,
   value,
-  hint,
 }: {
   label: string;
   value: React.ReactNode;
-  hint?: string;
 }) {
   return (
-    <div className="stat reveal">
-      <p className="eyebrow">{label}</p>
-      <p className="display mt-2 text-3xl tabular-nums">{value}</p>
-      {hint && <p className="mt-1 text-xs text-[var(--muted)]">{hint}</p>}
+    <div className="stat squircle">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
+      <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">
+        {value}
+      </p>
     </div>
   );
 }

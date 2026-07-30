@@ -11,17 +11,21 @@ import {
 } from "@ruleshop/engine";
 import {
   PROMPT_VERSION,
+  classifyFraudIncidents,
   explainDiff,
   isAiConfigured,
   narrateAnalysis,
+  narrateSimulation,
   proposeImprovement,
   proposeRuleFromNaturalLanguage,
   type ModelCall,
 } from "@/lib/ai";
+import { assessAnalysis, assessRuleProposal } from "@/lib/ai-trust";
 import { requireStoreRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { loadContextSchema, loadEditorSchema } from "@/lib/context-schema";
 import { toRuleDefs } from "@/lib/decide";
+import { computeFraudStats } from "@/lib/fraud-analysis";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 import { createDraftRuleset, saveRuleInDraft } from "./rules";
@@ -37,8 +41,14 @@ import { createDraftRuleset, saveRuleInDraft } from "./rules";
  */
 
 const HISTORY_LIMIT = 500;
-/** Sample size at which the analysis is treated as fully evidenced. */
-const CONFIDENT_SAMPLE = 200;
+/**
+ * Contexts replayed for per-rule impact.
+ *
+ * Impact costs one replay of the window per rule, so this is capped below the
+ * history limit: a smaller window measured promptly is more useful to a rule
+ * author than a larger one that makes the page hang.
+ */
+const IMPACT_LIMIT = 300;
 
 async function adminContext(slug: unknown) {
   const parsed = z.string().trim().min(1).max(80).safeParse(slug);
@@ -85,11 +95,14 @@ async function loadLiveRules(storeId: string): Promise<{
   return { version, rules: ruleset ? toRuleDefs(ruleset.rules) : [] };
 }
 
-async function loadHistory(storeId: string): Promise<HistoricalEvaluation[]> {
+async function loadHistory(
+  storeId: string,
+  limit: number = HISTORY_LIMIT,
+): Promise<HistoricalEvaluation[]> {
   const rows = await prisma.evaluation.findMany({
     where: { storeId },
     orderBy: { createdAt: "desc" },
-    take: HISTORY_LIMIT,
+    take: limit,
     select: { decisionType: true, context: true },
   });
 
@@ -134,10 +147,19 @@ export async function analyzeLiveRuleset(slug: string) {
     throw new Error("Nu există o versiune publicată de analizat");
   }
 
-  const evaluations = await loadMatchHistory(store.id, version);
+  const [evaluations, history] = await Promise.all([
+    loadMatchHistory(store.id, version),
+    loadHistory(store.id, IMPACT_LIMIT),
+  ]);
 
-  const analysis = analyzeRuleset({ rules, evaluations, schema });
+  // History is passed as well as match counts, so every rule is also replayed out
+  // of the ruleset to see what it is actually worth.
+  const analysis = analyzeRuleset({ rules, evaluations, schema, history });
   const narrative = await narrateAnalysis(analysis);
+  const trust = assessAnalysis({
+    sampleSize: analysis.sampleSize,
+    replaySampleSize: analysis.replaySampleSize,
+  });
 
   const suggestion = await prisma.aiSuggestion.create({
     data: {
@@ -148,14 +170,16 @@ export async function analyzeLiveRuleset(slug: string) {
       proposal: {
         narrative: narrative.ok ? narrative.data : null,
         narrativeError: narrative.ok ? null : narrative.error,
+        trust: trust as unknown as object,
       },
       analysis: analysis as unknown as object,
       metrics: {
         sampleSize: analysis.sampleSize,
         counts: analysis.counts,
       },
-      // Not the model's claim: this reflects how much evidence the sample gives.
-      confidence: Math.min(1, analysis.sampleSize / CONFIDENT_SAMPLE),
+      // The application's own assessment of how well evidenced this is. The model
+      // is not asked how confident it feels.
+      confidence: trust.score,
       status: "pending",
       ...traceFields(narrative.call),
     },
@@ -172,6 +196,8 @@ export async function analyzeLiveRuleset(slug: string) {
       version,
       findings: analysis.findings.length,
       sampleSize: analysis.sampleSize,
+      replaySampleSize: analysis.replaySampleSize,
+      trustScore: trust.score,
       model: narrative.call?.model ?? null,
       aiAvailable: isAiConfigured(),
     },
@@ -211,6 +237,25 @@ export async function proposeRuleFromText(
     existingKeys: rules.map((rule) => rule.key),
   });
 
+  // A new rule is additive, so the candidate ruleset is the live one plus this
+  // rule. Measured here rather than on request: a proposal shown without its
+  // effect invites approval on the strength of the prose alone.
+  let simulation: ReturnType<typeof simulateChange> | null = null;
+  if (result.ok) {
+    const history = await loadHistory(store.id);
+    if (history.length > 0) {
+      simulation = simulateChange(history, rules, [...rules, result.data.rule]);
+    }
+  }
+
+  const trust = result.ok
+    ? assessRuleProposal({
+        schemaValid: true,
+        simulation,
+        modelClaim: result.data.confidence,
+      })
+    : null;
+
   const suggestion = await prisma.aiSuggestion.create({
     data: {
       storeId: store.id,
@@ -221,9 +266,13 @@ export async function proposeRuleFromText(
         ? {
             rule: result.data.rule as unknown as object,
             reasoning: result.data.reasoning,
+            // The model's own figure, kept as a claim and never as the score.
+            modelConfidence: result.data.confidence,
+            trust: trust as unknown as object,
           }
         : { rule: null, error: result.error },
-      confidence: result.ok ? result.data.confidence : null,
+      metrics: (simulation as unknown as object) ?? undefined,
+      confidence: trust?.score ?? null,
       // A failed proposal is still recorded: a rejected suggestion belongs in the
       // audit trail rather than being hidden.
       status: result.ok ? "pending" : "rejected",
@@ -244,6 +293,9 @@ export async function proposeRuleFromText(
       category: category.data,
       model: result.call?.model ?? null,
       latencyMs: result.call?.latencyMs ?? null,
+      trustScore: trust?.score ?? null,
+      modelClaim: result.ok ? result.data.confidence : null,
+      sampleAdequacy: simulation?.sampleAdequacy ?? null,
       error: result.ok ? null : result.error,
     },
   });
@@ -329,6 +381,7 @@ export async function explainVersionDiff(
   });
 
   revalidatePath(`/s/${slug}/rules/ai`);
+  revalidatePath(`/s/${slug}/rules/diff`);
   if (!explanation.ok) throw new Error(explanation.error);
   return { id: suggestion.id };
 }
@@ -348,8 +401,17 @@ export async function proposeRuleImprovement(slug: string, rawRuleKey: unknown) 
   const rule = rules.find((r) => r.key === ruleKey.data);
   if (!rule) throw new Error("Regula nu există în versiunea publicată");
 
-  const evaluations = await loadMatchHistory(store.id, version);
-  const analysis = analyzeRuleset({ rules, evaluations, schema });
+  const [evaluations, history] = await Promise.all([
+    loadMatchHistory(store.id, version),
+    loadHistory(store.id),
+  ]);
+
+  const analysis = analyzeRuleset({
+    rules,
+    evaluations,
+    schema,
+    history: history.slice(0, IMPACT_LIMIT),
+  });
 
   const usage =
     analysis.usage.find((u) => u.key === rule.key) ?? {
@@ -362,19 +424,27 @@ export async function proposeRuleImprovement(slug: string, rawRuleKey: unknown) 
     rule,
     findings: analysis.findings.filter((f) => f.key === rule.key),
     usage,
+    impact: analysis.impacts.find((i) => i.key === rule.key) ?? null,
     schema,
   });
 
   // Measured before anyone is shown a recommendation: the candidate ruleset is
   // the live one with this rule replaced.
   let simulation: ReturnType<typeof simulateChange> | null = null;
-  if (result.ok) {
-    const history = await loadHistory(store.id);
+  if (result.ok && history.length > 0) {
     const candidate = rules.map((r) =>
       r.key === rule.key ? result.data.rule : r,
     );
     simulation = simulateChange(history, rules, candidate);
   }
+
+  const trust = result.ok
+    ? assessRuleProposal({
+        schemaValid: true,
+        simulation,
+        modelClaim: result.data.confidence,
+      })
+    : null;
 
   const suggestion = await prisma.aiSuggestion.create({
     data: {
@@ -387,14 +457,17 @@ export async function proposeRuleImprovement(slug: string, rawRuleKey: unknown) 
             rule: result.data.rule as unknown as object,
             reasoning: result.data.reasoning,
             before: rule as unknown as object,
+            modelConfidence: result.data.confidence,
+            trust: trust as unknown as object,
           }
         : { rule: null, error: result.error },
       analysis: {
         findings: analysis.findings.filter((f) => f.key === rule.key),
         usage,
+        impact: analysis.impacts.find((i) => i.key === rule.key) ?? null,
       } as unknown as object,
       metrics: simulation as unknown as object,
-      confidence: result.ok ? result.data.confidence : null,
+      confidence: trust?.score ?? null,
       status: result.ok ? "pending" : "rejected",
       reviewNote: result.ok ? null : result.error,
       targetRuleKey: rule.key,
@@ -414,6 +487,8 @@ export async function proposeRuleImprovement(slug: string, rawRuleKey: unknown) 
     meta: {
       ruleKey: rule.key,
       model: result.call?.model ?? null,
+      trustScore: trust?.score ?? null,
+      modelClaim: result.ok ? result.data.confidence : null,
       sampleAdequacy: simulation?.sampleAdequacy ?? null,
     },
   });
@@ -421,6 +496,198 @@ export async function proposeRuleImprovement(slug: string, rawRuleKey: unknown) 
   revalidatePath(`/s/${slug}/rules/ai`);
   if (!result.ok) throw new Error(result.error);
   return { id: suggestion.id };
+}
+
+/**
+ * Replays a whole candidate version against the live one.
+ *
+ * This is the shape §6 of the brief actually asks for: not "is this one rule
+ * better", but "what would publishing this version do". A draft can add, remove
+ * and reorder rules at once, and the interactions between those changes are
+ * exactly what a per-rule check cannot see.
+ *
+ * Needs no API key. The comparison is arithmetic over replayed decisions; the
+ * model is asked afterwards to put the result into words, and its absence costs
+ * only the prose.
+ */
+export async function simulateVersion(slug: string, rawVersion: unknown) {
+  const { store, authz } = await adminContext(slug);
+
+  const candidateVersion = z
+    .number()
+    .int()
+    .positive()
+    .safeParse(Number(rawVersion));
+  if (!candidateVersion.success) throw new Error("Versiune invalidă");
+
+  const [{ version: liveVersion, rules: liveRules }, candidateRuleset, history] =
+    await Promise.all([
+      loadLiveRules(store.id),
+      prisma.ruleset.findUnique({
+        where: {
+          storeId_version: { storeId: store.id, version: candidateVersion.data },
+        },
+        include: { rules: true },
+      }),
+      loadHistory(store.id),
+    ]);
+
+  if (!candidateRuleset) throw new Error("Versiune inexistentă");
+  if (history.length === 0) {
+    throw new Error(
+      "Nu există evaluări înregistrate pe care să se poată face simularea",
+    );
+  }
+  if (candidateVersion.data === liveVersion) {
+    throw new Error(
+      "Versiunea selectată este deja publicată; nu există nimic de comparat",
+    );
+  }
+
+  const candidateRules = toRuleDefs(candidateRuleset.rules);
+  const simulation = simulateChange(history, liveRules, candidateRules);
+
+  const label =
+    liveVersion == null
+      ? `Versiunea candidat v${candidateVersion.data} față de niciun set publicat`
+      : `Versiunea candidat v${candidateVersion.data} față de v${liveVersion} (publicată)`;
+
+  const narrative = await narrateSimulation({ label, simulation });
+
+  const suggestion = await prisma.aiSuggestion.create({
+    data: {
+      storeId: store.id,
+      userId: authz.session.user.id,
+      kind: "version_simulation",
+      prompt: `simulate:v${candidateVersion.data} vs v${liveVersion ?? "none"}`,
+      proposal: {
+        narrative: narrative.ok ? narrative.data : null,
+        narrativeError: narrative.ok ? null : narrative.error,
+      },
+      analysis: {
+        candidateVersion: candidateVersion.data,
+        liveVersion,
+        candidateRuleCount: candidateRules.length,
+        liveRuleCount: liveRules.length,
+      } as unknown as object,
+      metrics: simulation as unknown as object,
+      // A simulation is a measurement, so its trustworthiness is the adequacy of
+      // the sample it ran on and nothing else.
+      confidence:
+        simulation.sampleAdequacy === "reasonable"
+          ? 1
+          : simulation.sampleAdequacy === "indicative"
+            ? 0.5
+            : 0.2,
+      status: "pending",
+      ...traceFields(narrative.call),
+    },
+    select: { id: true },
+  });
+
+  await writeAudit({
+    storeId: store.id,
+    userId: authz.session.user.id,
+    action: "ai.simulate_version",
+    entity: "AiSuggestion",
+    entityId: suggestion.id,
+    meta: {
+      candidateVersion: candidateVersion.data,
+      liveVersion,
+      sampleSize: history.length,
+      sampleAdequacy: simulation.sampleAdequacy,
+      revenueDelta:
+        simulation.candidate.grossRevenue - simulation.current.grossRevenue,
+      discountCostDelta:
+        simulation.candidate.discountCost - simulation.current.discountCost,
+      blockedDelta:
+        simulation.candidate.blockedCount - simulation.current.blockedCount,
+    },
+  });
+
+  revalidatePath(`/s/${slug}/rules/ai`);
+  revalidatePath(`/s/${slug}/rules/${candidateVersion.data}`);
+  return {
+    id: suggestion.id,
+    sampleAdequacy: simulation.sampleAdequacy,
+  };
+}
+
+/**
+ * Triages the checkouts the fraud rules refused.
+ *
+ * The statistics — block rate, value refused, which rule refused what, and which
+ * refused customers have already paid for orders here — are computed from the
+ * order table. The model receives them read-only and contributes one label from a
+ * closed set per incident. It cannot invent an order: ids outside the list are
+ * dropped and reported.
+ *
+ * This is the AI feature that touches the shop rather than the rule editor, which
+ * is why it starts from real refusals instead of from a ruleset.
+ */
+export async function triageFraudIncidents(slug: string) {
+  const { store, authz } = await adminContext(slug);
+
+  const stats = await computeFraudStats(store.id);
+  const triage = await classifyFraudIncidents({ stats });
+
+  const suggestion = await prisma.aiSuggestion.create({
+    data: {
+      storeId: store.id,
+      userId: authz.session.user.id,
+      kind: "fraud_triage",
+      prompt: `fraud:${stats.windowDays}d`,
+      proposal: triage.ok
+        ? {
+            narrative: triage.data.summary,
+            recommendation: triage.data.recommendation,
+            classifications:
+              triage.data.classifications as unknown as object[],
+            dropped: triage.data.dropped,
+          }
+        : { classifications: [], error: triage.error },
+      // Statistics stay in the column reserved for what the application computed.
+      analysis: stats as unknown as object,
+      metrics: {
+        blocked: stats.blocked,
+        blockRate: stats.blockRate,
+        blockedValue: stats.blockedValue,
+        suspectedFalsePositives: stats.suspectedFalsePositives,
+      },
+      // Reflects the evidence, not the model: how many of the real incidents it
+      // managed to classify.
+      confidence: triage.ok
+        ? Math.round(
+            (triage.data.classifications.length / stats.incidents.length) * 100,
+          ) / 100
+        : null,
+      status: triage.ok ? "pending" : "rejected",
+      reviewNote: triage.ok ? null : triage.error,
+      ...traceFields(triage.call),
+    },
+    select: { id: true },
+  });
+
+  await writeAudit({
+    storeId: store.id,
+    userId: authz.session.user.id,
+    action: triage.ok ? "ai.fraud_triage" : "ai.fraud_triage_failed",
+    entity: "AiSuggestion",
+    entityId: suggestion.id,
+    meta: {
+      windowDays: stats.windowDays,
+      checkouts: stats.checkouts,
+      blocked: stats.blocked,
+      classified: triage.ok ? triage.data.classifications.length : 0,
+      dropped: triage.ok ? triage.data.dropped.length : 0,
+      model: triage.call?.model ?? null,
+      error: triage.ok ? null : triage.error,
+    },
+  });
+
+  revalidatePath(`/s/${slug}/rules/ai`);
+  if (!triage.ok) throw new Error(triage.error);
+  return { id: suggestion.id, classified: triage.data.classifications.length };
 }
 
 /**
@@ -457,9 +724,32 @@ export async function simulateSuggestion(slug: string, rawId: unknown) {
 
   const simulation = simulateChange(history, rules, candidate);
 
+  // The trust score is a function of the measurement, so re-measuring has to
+  // re-score: leaving the old number next to new figures would be misleading.
+  const existing = suggestion.proposal as {
+    modelConfidence?: unknown;
+    [key: string]: unknown;
+  };
+  const modelClaim =
+    typeof existing?.modelConfidence === "number"
+      ? existing.modelConfidence
+      : null;
+  const trust = assessRuleProposal({
+    schemaValid: true,
+    simulation,
+    modelClaim,
+  });
+
   await prisma.aiSuggestion.update({
     where: { id: suggestion.id },
-    data: { metrics: simulation as unknown as object },
+    data: {
+      metrics: simulation as unknown as object,
+      confidence: trust.score,
+      proposal: {
+        ...existing,
+        trust: trust as unknown as object,
+      } as unknown as object,
+    },
   });
 
   await writeAudit({
@@ -471,6 +761,7 @@ export async function simulateSuggestion(slug: string, rawId: unknown) {
     meta: {
       sampleSize: history.length,
       sampleAdequacy: simulation.sampleAdequacy,
+      trustScore: trust.score,
       revenueDelta:
         simulation.candidate.grossRevenue - simulation.current.grossRevenue,
     },

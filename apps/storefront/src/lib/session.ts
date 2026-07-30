@@ -1,34 +1,35 @@
-import { cookies } from "next/headers";
-import { SESSION_COOKIE } from "./api";
+const TOKEN_KEY = "rs_token";
+const GUEST_KEY = "rs_guest";
 
-/**
- * Customer session storage.
- *
- * The bearer token issued by the control plane is kept in an httpOnly cookie and
- * only ever read on the server. It is never sent to the browser, so a script on
- * the page cannot exfiltrate it, and the storefront attaches it to API calls on
- * the customer's behalf.
- */
-
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
-
-export async function setSessionToken(token: string): Promise<void> {
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_MAX_AGE,
-  });
+export function getSessionToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
-export async function clearSessionToken(): Promise<void> {
-  const jar = await cookies();
-  jar.delete(SESSION_COOKIE);
+export function setSessionToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
-export async function hasSession(): Promise<boolean> {
-  const jar = await cookies();
-  return Boolean(jar.get(SESSION_COOKIE)?.value);
+export function getOrCreateGuestId(): string {
+  try {
+    const existing = localStorage.getItem(GUEST_KEY);
+    if (existing && /^g_[A-Za-z0-9_-]{8,64}$/.test(existing)) return existing;
+    const id = `g_${crypto.randomUUID().replace(/-/g, "").slice(0, 24)}`;
+    localStorage.setItem(GUEST_KEY, id);
+    return id;
+  } catch {
+    return "g_anonymous";
+  }
+}
+
+export function clearSession() {
+  setSessionToken(null);
 }

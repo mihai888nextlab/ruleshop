@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { customerContext } from "@/lib/customer";
+import { customerContext, storeLoyaltyPoints } from "@/lib/customer";
 import { runDecision } from "@/lib/decide";
 import { getOrCreateGuestId, getStoreBySlug } from "@/lib/store";
 import { prisma } from "@/lib/prisma";
 import { formatRon } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { DecisionPanel } from "@/components/decision-panel";
+import { StorefrontChrome } from "@/components/storefront-chrome";
 
 export default async function CatalogPage({
   params,
@@ -49,13 +50,7 @@ export default async function CatalogPage({
   const subjectKey = session?.user?.id
     ? `user:${session.user.id}`
     : `guest:${guestId}`;
-  let loyaltyPoints = 0;
-  if (session?.user?.id) {
-    loyaltyPoints =
-      (
-        await prisma.user.findUnique({ where: { id: session.user.id } })
-      )?.loyaltyPoints ?? 0;
-  }
+  const loyaltyPoints = await storeLoyaltyPoints(store.id, session?.user?.id);
   const customer = customerContext(session, loyaltyPoints);
 
   const priced = await Promise.all(
@@ -112,10 +107,13 @@ export default async function CatalogPage({
   );
 
   return (
+    <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="flex flex-col gap-8">
-      <section className="rounded-2xl bg-[var(--hero)] px-6 py-10 text-[var(--accent-fg)]">
-        <h1 className="display text-4xl sm:text-5xl">{store.name}</h1>
-        <p className="mt-2 max-w-xl text-sm opacity-90">
+      <section className="border-b border-[var(--border)] pb-6">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          {store.name}
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
           Prețurile și disponibilitatea sunt calculate de rule engine în timp
           real.
         </p>
@@ -126,12 +124,12 @@ export default async function CatalogPage({
           name="q"
           defaultValue={sp.q}
           placeholder="Caută produse…"
-          className="min-w-[200px] flex-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+          className="min-w-[200px] flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
         />
         <select
           name="category"
           defaultValue={sp.category ?? ""}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
+          className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
         >
           <option value="">Toate categoriile</option>
           {categories.map((c) => (
@@ -142,7 +140,7 @@ export default async function CatalogPage({
         </select>
         <button
           type="submit"
-          className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-fg)]"
+          className="rounded-[var(--radius)] bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-fg)]"
         >
           Filtrează
         </button>
@@ -154,10 +152,10 @@ export default async function CatalogPage({
             <Link
               key={p.id}
               href={`/s/${slug}/products/${p.slug}`}
-              className="flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4"
+              className="flex flex-col gap-3 border border-[var(--border)] bg-[var(--surface)] p-4"
             >
               <div className="flex items-start justify-between gap-2">
-                <h2 className="display text-xl">{p.name}</h2>
+                <h2 className="font-semibold tracking-tight text-xl">{p.name}</h2>
                 {!available && <Badge tone="warn">Indisponibil</Badge>}
               </div>
               <p className="line-clamp-2 text-sm text-[var(--muted)]">
@@ -200,5 +198,6 @@ export default async function CatalogPage({
         />
       )}
     </div>
+    </StorefrontChrome>
   );
 }

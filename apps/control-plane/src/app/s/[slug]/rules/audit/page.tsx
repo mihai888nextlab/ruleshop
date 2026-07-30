@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { PageHeader } from "@/components/dashboard/shell";
+import { AuditList } from "@/components/lists/audit-list";
 import { requireStoreRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
@@ -24,37 +25,18 @@ export default async function AuditPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
-        ← Control plane
-      </Link>
-      <h1 className="display text-3xl">Jurnal de audit</h1>
-      <ul className="flex flex-col gap-2">
-        {logs.map((l) => (
-          <li
-            key={l.id}
-            className="rounded border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
-          >
-            <span className="text-[var(--muted)]">
-              {l.createdAt.toLocaleString("ro-RO")}
-            </span>{" "}
-            · <strong>{l.action}</strong>
-            {l.entity && (
-              <>
-                {" "}
-                · {l.entity} {l.entityId}
-              </>
-            )}
-            {l.user?.email && (
-              <span className="text-[var(--muted)]"> · {l.user.email}</span>
-            )}
-            {l.meta != null && (
-              <pre className="mt-1 overflow-x-auto text-xs">
-                {JSON.stringify(l.meta, null, 2)}
-              </pre>
-            )}
-          </li>
-        ))}
-      </ul>
+      <PageHeader title="Jurnal de audit" />
+      <AuditList
+        logs={logs.map((l) => ({
+          id: l.id,
+          action: l.action,
+          entity: l.entity,
+          entityId: l.entityId,
+          email: l.user?.email ?? null,
+          createdAt: l.createdAt.toISOString(),
+          meta: l.meta != null ? JSON.stringify(l.meta, null, 2) : null,
+        }))}
+      />
     </div>
   );
 }

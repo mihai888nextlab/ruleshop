@@ -7,6 +7,7 @@ import {
 } from "@ruleshop/contracts";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { AddButton, Modal } from "../ui/modal";
 import { ThemeEditor } from "./theme-editor";
 import { ThemePreview } from "./theme-preview";
 
@@ -40,6 +41,7 @@ export interface ThemeActions {
   setDefault: (id: string) => Promise<unknown>;
   duplicate: (id: string) => Promise<unknown>;
   remove: (id: string) => Promise<unknown>;
+  uploadHero: (formData: FormData) => Promise<string>;
 }
 
 export function ThemeManager({
@@ -72,32 +74,15 @@ export function ThemeManager({
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           {error}
         </p>
       )}
 
-      {creating && (
-        <section className="panel p-5">
-          <h2 className="mb-4 text-lg font-semibold">Temă nouă</h2>
-          <ThemeEditor
-            isNew
-            initialKey=""
-            initialName=""
-            initialTokens={DEFAULT_THEME_TOKENS}
-            onSave={async (input) => {
-              await actions.create(input);
-              setCreating(false);
-            }}
-            onCancel={themes.length > 0 ? () => setCreating(false) : undefined}
-          />
-        </section>
-      )}
-
       {editing && (
         <section className="panel p-5">
-          <h2 className="mb-4 text-lg font-semibold">
+          <h2 className="mb-4 text-lg font-semibold tracking-tight">
             Editează „{editing.name}”
           </h2>
           <ThemeEditor
@@ -105,6 +90,7 @@ export function ThemeManager({
             initialKey={editing.key}
             initialName={editing.name}
             initialTokens={editing.tokens}
+            onUploadHero={actions.uploadHero}
             onSave={async (input) => {
               await actions.update(editing.id, {
                 name: input.name,
@@ -118,25 +104,22 @@ export function ThemeManager({
       )}
 
       <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="eyebrow">Teme definite</h2>
-          <Badge tone="muted">{themes.length}</Badge>
-          {!creating && (
-            <Button
-              type="button"
-              size="sm"
-              className="ml-auto"
-              onClick={() => setCreating(true)}
-            >
-              Temă nouă
-            </Button>
-          )}
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
+            Teme definite
+            <span className="text-sm font-normal tabular-nums text-[var(--muted)]">
+              {themes.length}
+            </span>
+          </h2>
+          <AddButton
+            label="Adaugă temă"
+            onClick={() => setCreating(true)}
+          />
         </div>
 
         {themes.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
-            Nicio temă definită. Magazinul folosește tema implicită până când
-            creezi una.
+          <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
+            Nicio temă definită.
           </p>
         ) : (
           <ul className="grid gap-5 lg:grid-cols-2">
@@ -208,6 +191,30 @@ export function ThemeManager({
           </ul>
         )}
       </section>
+
+      <Modal
+        open={creating}
+        onClose={() => {
+          if (themes.length > 0) setCreating(false);
+        }}
+        title="Temă nouă"
+        className="max-w-lg"
+      >
+        <ThemeEditor
+          isNew
+          initialKey=""
+          initialName=""
+          initialTokens={DEFAULT_THEME_TOKENS}
+          onUploadHero={actions.uploadHero}
+          onSave={async (input) => {
+            await actions.create(input);
+            setCreating(false);
+          }}
+          onCancel={
+            themes.length > 0 ? () => setCreating(false) : undefined
+          }
+        />
+      </Modal>
     </div>
   );
 }

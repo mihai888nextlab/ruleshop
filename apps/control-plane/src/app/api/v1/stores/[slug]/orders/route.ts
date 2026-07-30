@@ -21,7 +21,7 @@ export async function GET(
     const store = await findStoreBySlug(slug);
     if (!store) return apiError("Magazin inexistent", 404);
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     if (identity.kind !== "user") {
       // Guests have no durable identity to list against; they look up a single
       // order by id and email instead.

@@ -28,7 +28,7 @@ export async function GET(
       return apiError("Parametri invalizi", 400, query.error.flatten());
     }
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     const catalog = await buildCatalog({
       store,
       identity,

@@ -33,7 +33,7 @@ export async function POST(
       return apiError("Date invalide", 400, parsed.error.flatten());
     }
 
-    const identity = await resolveApiIdentity(request);
+    const identity = await resolveApiIdentity(request, store.id);
     const cart = await resolveCart(
       store.id,
       identity,

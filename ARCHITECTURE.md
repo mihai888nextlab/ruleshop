@@ -65,11 +65,14 @@ Rules for a `decisionType` are sorted by **priority descending**. For each actio
 
 Roles: `CUSTOMER`, `OPERATOR`, `STORE_ADMIN`, `PLATFORM_ADMIN`.
 
-Store roles are on `Membership`. Platform admin bypasses store checks. APIs and server actions always filter by `storeId`.
+Store roles are on `Membership` (including per-store `loyaltyPoints`). Platform admin bypasses store checks. APIs and server actions always filter by `storeId`.
 
-## AI (Moonshot Kimi)
+Storefront customer JWTs are bound to `storeId` and require an active membership for that store. Storefront traffic resolves the tenant from `X-RuleShop-Key` (hashed at rest) — never from a client-supplied store id.
 
-- OpenAI-compatible client → `https://api.moonshot.ai/v1`
+## AI (Google Gemini)
+
+- OpenAI-compatible client → `https://generativelanguage.googleapis.com/v1beta/openai/`
+- Default model: `gemini-flash-latest` (`GEMINI_MODEL`)
 - Analyze unused rules (hit counts computed in-app)
 - NL → structured rule (validated)
 - Simulate candidate on historical evaluations (metrics computed in-app)
@@ -86,4 +89,4 @@ Store roles are on `Membership`. Platform admin bypasses store checks. APIs and 
 - Structured form + JSON AST editor instead of full drag-and-drop builder (faster, safer for the contest window)
 - Payment is simulated
 - Guest order history is confirmation-page based; authenticated users get full history
-- AI features degrade gracefully without `MOONSHOT_API_KEY` (local analysis still works for unused-rule stats)
+- AI features degrade gracefully without `GEMINI_API_KEY` (local analysis still works for unused-rule stats)

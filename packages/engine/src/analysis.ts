@@ -1,6 +1,8 @@
 import { actionConflictKey } from "./actions";
 import { describeConditionWith } from "./describe";
+import { computeRuleImpact, type RuleImpact } from "./impact";
 import type { ContextSchema } from "./schema";
+import type { HistoricalEvaluation } from "./simulate";
 import {
   isComparisonCondition,
   isGroupCondition,
@@ -43,6 +45,7 @@ export type RuleFinding = {
   code:
     | "unused"
     | "never-wins"
+    | "no-effect"
     | "duplicate"
     | "shadowed"
     | "contradictory"
@@ -313,6 +316,11 @@ export function findUsageIssues(
 ): RuleFinding[] {
   const findings: RuleFinding[] = [];
 
+  // With nothing recorded there is no evidence either way, and "unused" would be
+  // an accusation rather than an observation. Draft versions have never been
+  // evaluated by definition, so this is the normal case, not an edge one.
+  if (options.minimumSample === 0) return findings;
+
   for (const rule of rules) {
     if (!rule.enabled) continue;
 
@@ -390,20 +398,71 @@ export function buildUsage(
   return usage;
 }
 
+/**
+ * Findings that only a replay can produce.
+ *
+ * A rule can match, win its conflict, and still leave every decision exactly as
+ * it was — a discount of zero, or an availability flag set to the value the
+ * decision already carried. Hit counts call that healthy; leave-one-out replay
+ * calls it what it is.
+ *
+ * Rules already reported as unused or never-wins are skipped: those findings
+ * explain the same silence more precisely, and two warnings for one problem make
+ * a report harder to act on, not more thorough.
+ */
+export function findImpactIssues(
+  impacts: RuleImpact[],
+  alreadyFlagged: Set<string>,
+): RuleFinding[] {
+  const findings: RuleFinding[] = [];
+
+  for (const impact of impacts) {
+    if (impact.verdict !== "no-effect") continue;
+    if (alreadyFlagged.has(impact.key)) continue;
+
+    findings.push({
+      key: impact.key,
+      severity: "warning",
+      code: "no-effect",
+      message: `S-a potrivit de ${impact.matched} ori, dar eliminarea ei nu ar schimba nicio decizie din istoric.`,
+      detail:
+        "Regula scrie un rezultat pe care decizia îl avea oricum, sau este suprascrisă de una cu prioritate mai mare.",
+    });
+  }
+
+  return findings;
+}
+
 export interface RulesetAnalysis {
   sampleSize: number;
   usage: RuleUsage[];
   findings: RuleFinding[];
   counts: Record<RuleFinding["code"], number>;
+  /**
+   * Per-rule measured contribution. Empty when no contexts were supplied — the
+   * usage counts above need only the matched keys, but measuring impact requires
+   * replaying the original contexts.
+   */
+  impacts: RuleImpact[];
+  /** Evaluations replayed for the impact measurement. */
+  replaySampleSize: number;
 }
 
-/** Full analysis: structure plus recorded behaviour. */
+/**
+ * Full analysis: structure, recorded behaviour, and measured contribution.
+ *
+ * `evaluations` carries the matched keys of past decisions and is enough for hit
+ * and win counts. `history` carries the original contexts, and when it is given
+ * every rule is additionally replayed out of the ruleset to see what it is worth.
+ */
 export function analyzeRuleset(input: {
   rules: RuleDefinition[];
   evaluations: { matchedRules: string[] }[];
   schema?: ContextSchema;
+  history?: HistoricalEvaluation[];
 }): RulesetAnalysis {
   const usage = buildUsage(input.rules, input.evaluations);
+  const history = input.history ?? [];
 
   const findings = [
     ...findStructuralIssues(input.rules, input.schema),
@@ -412,9 +471,34 @@ export function analyzeRuleset(input: {
     }),
   ];
 
+  const impacts =
+    history.length > 0 ? computeRuleImpact(history, input.rules) : [];
+
+  /**
+   * Usage counts come from evaluations recorded under one version, while the
+   * replay can draw on a wider window of contexts — a rule may therefore have no
+   * recorded match and still provably fire on real traffic.
+   *
+   * When the two disagree the replay is the stronger evidence, so the "unused"
+   * finding is dropped instead of being shown beside a measured effect. Reporting
+   * both would leave a reviewer to decide which of two contradictory statements
+   * from the same screen to believe.
+   */
+  const measuredToMatch = new Set(
+    impacts.filter((impact) => impact.matched > 0).map((impact) => impact.key),
+  );
+  const reconciled = findings.filter(
+    (finding) => !(finding.code === "unused" && measuredToMatch.has(finding.key)),
+  );
+
+  reconciled.push(
+    ...findImpactIssues(impacts, new Set(reconciled.map((f) => f.key))),
+  );
+
   const counts = {
     unused: 0,
     "never-wins": 0,
+    "no-effect": 0,
     duplicate: 0,
     shadowed: 0,
     contradictory: 0,
@@ -422,12 +506,14 @@ export function analyzeRuleset(input: {
     disabled: 0,
   } satisfies Record<RuleFinding["code"], number>;
 
-  for (const finding of findings) counts[finding.code] += 1;
+  for (const finding of reconciled) counts[finding.code] += 1;
 
   return {
     sampleSize: input.evaluations.length,
     usage: [...usage.values()],
-    findings,
+    findings: reconciled,
     counts,
+    impacts,
+    replaySampleSize: history.length,
   };
 }

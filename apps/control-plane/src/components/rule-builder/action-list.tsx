@@ -1,53 +1,44 @@
 "use client";
 
+import { useDroppable } from "@dnd-kit/core";
 import type { Action, DecisionType } from "@ruleshop/engine";
+import { DROP_THEN_ID } from "./condition-tree";
 
 /**
- * Action blocks: what a rule does when it matches.
- *
- * Each action type gets its own typed fields rather than a generic key/value
- * editor, and the palette only offers the actions that make sense for the rule's
- * decision type — a shipping rule cannot grant loyalty points, because nothing
- * would read that decision at the point shipping is resolved.
+ * Action bricks for the „Atunci” mouth of the Scratch C-block.
  */
 
 type ActionType = Action["type"];
 
-interface ActionMeta {
+export interface ActionMeta {
   type: ActionType;
   label: string;
-  hint: string;
-  /** Decision types where this action has an effect. */
   scopes: DecisionType[];
   create: () => Action;
 }
 
-const ACTIONS: ActionMeta[] = [
+export const ACTIONS: ActionMeta[] = [
   {
     type: "discountPercent",
     label: "Reducere procentuală",
-    hint: "scade un procent din preț",
     scopes: ["pricing"],
     create: () => ({ type: "discountPercent", value: 10 }),
   },
   {
     type: "setFixedPrice",
     label: "Preț fix",
-    hint: "înlocuiește prețul complet",
     scopes: ["pricing"],
     create: () => ({ type: "setFixedPrice", value: 0 }),
   },
   {
     type: "setShipping",
     label: "Metodă de livrare impusă",
-    hint: "o singură opțiune, cu cost",
     scopes: ["shipping"],
     create: () => ({ type: "setShipping", method: "standard", cost: 0 }),
   },
   {
     type: "addShippingOption",
     label: "Adaugă opțiune de livrare",
-    hint: "se cumulează cu alte opțiuni",
     scopes: ["shipping"],
     create: () => ({
       type: "addShippingOption",
@@ -59,42 +50,36 @@ const ACTIONS: ActionMeta[] = [
   {
     type: "blockCheckout",
     label: "Blochează comanda",
-    hint: "oprește finalizarea, cu motiv",
     scopes: ["fraud"],
     create: () => ({ type: "blockCheckout", reason: "" }),
   },
   {
     type: "flagFraud",
     label: "Marchează risc",
-    hint: "scor 0–100, fără a bloca",
     scopes: ["fraud"],
     create: () => ({ type: "flagFraud", score: 50, reason: "" }),
   },
   {
     type: "setAvailability",
     label: "Disponibilitate",
-    hint: "ascunde sau afișează produsul",
     scopes: ["availability"],
     create: () => ({ type: "setAvailability", available: false, reason: "" }),
   },
   {
     type: "grantLoyalty",
     label: "Acordă puncte",
-    hint: "puncte de loialitate",
     scopes: ["loyalty"],
     create: () => ({ type: "grantLoyalty", points: 10 }),
   },
   {
     type: "setTheme",
     label: "Temă vizuală",
-    hint: "schimbă aspectul magazinului",
     scopes: ["theme"],
     create: () => ({ type: "setTheme", themeId: "" }),
   },
   {
     type: "set",
     label: "Câmp personalizat",
-    hint: "scrie orice cheie în decizie",
     scopes: [
       "pricing",
       "shipping",
@@ -117,9 +102,6 @@ export function defaultActionFor(decisionType: DecisionType): Action {
   return first ? first.create() : { type: "set", path: "", value: "" };
 }
 
-const inputClass =
-  "rounded border border-white/15 bg-black/30 px-2 py-1 text-sm text-white outline-none focus:border-white/40 placeholder:text-white/30";
-
 export function ActionList({
   actions,
   decisionType,
@@ -131,46 +113,41 @@ export function ActionList({
   decisionType: DecisionType;
   onChange: (next: Action[]) => void;
   errors: string[];
-  /** Themes this store has defined, so setTheme picks rather than types. */
   themeKeys: string[];
 }) {
   const available = actionsForScope(decisionType);
+  const { setNodeRef, isOver } = useDroppable({ id: DROP_THEN_ID });
 
   function update(index: number, next: Action) {
     onChange(actions.map((a, i) => (i === index ? next : a)));
   }
 
   return (
-    <div className="rounded-lg bg-[#12161f] p-3 ring-1 ring-white/10">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded bg-violet-400/25 px-2 py-0.5 text-xs font-semibold text-violet-100">
-          ATUNCI
-        </span>
-        <span className="text-xs text-white/40">
-          acțiunile aplicate când condițiile sunt îndeplinite
-        </span>
-      </div>
-
+    <div
+      ref={setNodeRef}
+      data-over={isOver || undefined}
+      className="rb-mouth rb-mouth--then"
+    >
       {errors.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-0.5">
+        <ul className="flex flex-col gap-0.5">
           {errors.map((error, i) => (
-            <li key={i} className="text-xs text-rose-300">
+            <li key={i} className="rb-block-error">
               {error}
             </li>
           ))}
         </ul>
       )}
 
-      <div className="mt-2 flex flex-col gap-2">
+      <div className="rb-action-stack">
         {actions.map((action, index) => (
-          <div
-            key={index}
-            className="rounded-lg border-2 border-violet-400/50 bg-violet-500/10 p-2"
-          >
-            <div className="flex flex-wrap items-center gap-2">
+          <div key={index} className="rb-block rb-block--action">
+            <div className="rb-block-head">
+              <span className="rb-action-index" aria-hidden>
+                {index + 1}
+              </span>
               <select
                 aria-label="Tip acțiune"
-                className={inputClass}
+                className="rb-reporter"
                 value={action.type}
                 onChange={(e) => {
                   const meta = ACTIONS.find((a) => a.type === e.target.value);
@@ -182,8 +159,6 @@ export function ActionList({
                     {meta.label}
                   </option>
                 ))}
-                {/* An action stored before the category changed stays visible so
-                    it can be seen and removed, rather than vanishing silently. */}
                 {!available.some((m) => m.type === action.type) && (
                   <option value={action.type}>
                     {action.type} (nepotrivit pentru {decisionType})
@@ -200,29 +175,27 @@ export function ActionList({
               <button
                 type="button"
                 aria-label="Șterge acțiunea"
-                className="ml-auto rounded px-1.5 py-0.5 text-xs text-white/50 hover:bg-white/10 hover:text-white"
+                className="rb-icon-btn ml-auto"
                 onClick={() => onChange(actions.filter((_, i) => i !== index))}
               >
                 ×
               </button>
             </div>
-
-            <p className="mt-1 text-[10px] text-white/30">
-              {ACTIONS.find((a) => a.type === action.type)?.hint}
-            </p>
           </div>
         ))}
 
         {actions.length === 0 && (
-          <p className="rounded border border-dashed border-white/20 px-2 py-3 text-center text-xs text-white/35">
-            O regulă are nevoie de cel puțin o acțiune.
+          <p className="rb-slot" data-over={isOver || undefined}>
+            Trage o acțiune aici
           </p>
         )}
 
         <button
           type="button"
-          className="self-start rounded border border-white/20 bg-white/5 px-2 py-0.5 text-xs text-white/70 hover:border-white/40 hover:text-white"
-          onClick={() => onChange([...actions, defaultActionFor(decisionType)])}
+          className="rb-add-btn self-start"
+          onClick={() =>
+            onChange([...actions, defaultActionFor(decisionType)])
+          }
         >
           + acțiune
         </button>
@@ -322,10 +295,10 @@ function ActionFields({
     case "setAvailability":
       return (
         <>
-          <label className="flex items-center gap-1 text-xs text-white/60">
+          <label className="flex items-center gap-1 text-xs text-[var(--muted)]">
             Disponibil
             <select
-              className={inputClass}
+              className="rb-reporter"
               value={action.available ? "true" : "false"}
               onChange={(e) =>
                 onChange({ ...action, available: e.target.value === "true" })
@@ -348,18 +321,18 @@ function ActionFields({
         <NumberField
           label="Puncte"
           value={action.points}
-          onChange={(points) => onChange({ ...action, points: Math.round(points) })}
+          onChange={(points) =>
+            onChange({ ...action, points: Math.round(points) })
+          }
         />
       );
 
     case "setTheme":
-      // A select over defined themes: a mistyped key would resolve to nothing
-      // and silently leave the cohort on the default theme.
       return themeKeys.length > 0 ? (
-        <label className="flex items-center gap-1 text-xs text-white/60">
+        <label className="flex items-center gap-1 text-xs text-[var(--muted)]">
           Temă
           <select
-            className={inputClass}
+            className="rb-reporter"
             value={action.themeId}
             onChange={(event) =>
               onChange({ ...action, themeId: event.target.value })
@@ -379,8 +352,8 @@ function ActionFields({
           </select>
         </label>
       ) : (
-        <span className="text-xs text-amber-300/80">
-          Magazinul nu are teme definite — creează una în secțiunea Teme.
+        <span className="text-xs text-[var(--warn)]">
+          Magazinul nu are teme definite.
         </span>
       );
 
@@ -419,18 +392,18 @@ function NumberField({
   suffix?: string;
 }) {
   return (
-    <label className="flex items-center gap-1 text-xs text-white/60">
+    <label className="flex items-center gap-1 text-xs text-[var(--muted)]">
       {label}
       <input
         type="number"
         step="any"
         min={min}
         max={max}
-        className={`${inputClass} w-24`}
+        className="rb-reporter w-24"
         value={Number.isFinite(value) ? value : ""}
         onChange={(e) => onChange(Number(e.target.value))}
       />
-      {suffix && <span className="text-white/40">{suffix}</span>}
+      {suffix && <span>{suffix}</span>}
     </label>
   );
 }
@@ -449,10 +422,10 @@ function TextField({
   wide?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-1 text-xs text-white/60">
+    <label className="flex items-center gap-1 text-xs text-[var(--muted)]">
       {label}
       <input
-        className={`${inputClass} ${wide ? "w-56" : "w-32"}`}
+        className={`rb-reporter ${wide ? "w-56" : "w-32"}`}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}

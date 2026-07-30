@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { customerContext } from "@/lib/customer";
+import { customerContext, storeLoyaltyPoints } from "@/lib/customer";
 import { runDecision } from "@/lib/decide";
 import { getOrCreateGuestId, getStoreBySlug } from "@/lib/store";
 import { prisma } from "@/lib/prisma";
@@ -9,6 +9,7 @@ import { addToCart } from "@/app/actions/cart";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DecisionPanel } from "@/components/decision-panel";
+import { StorefrontChrome } from "@/components/storefront-chrome";
 
 export default async function ProductPage({
   params,
@@ -30,13 +31,7 @@ export default async function ProductPage({
   const subjectKey = session?.user?.id
     ? `user:${session.user.id}`
     : `guest:${guestId}`;
-  let loyaltyPoints = 0;
-  if (session?.user?.id) {
-    loyaltyPoints =
-      (
-        await prisma.user.findUnique({ where: { id: session.user.id } })
-      )?.loyaltyPoints ?? 0;
-  }
+  const loyaltyPoints = await storeLoyaltyPoints(store.id, session?.user?.id);
   const customer = customerContext(session, loyaltyPoints);
   const base = Number(product.basePrice.toString());
 
@@ -99,10 +94,11 @@ export default async function ProductPage({
   }
 
   return (
+    <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="grid gap-8 lg:grid-cols-2">
       <div>
         <Badge tone="muted">{product.category}</Badge>
-        <h1 className="display mt-2 text-4xl">{product.name}</h1>
+        <h1 className="font-semibold tracking-tight mt-2 text-4xl">{product.name}</h1>
         <p className="mt-3 text-[var(--muted)]">{product.description}</p>
         <div className="mt-6">
           {discount > 0 && (
@@ -149,5 +145,6 @@ export default async function ProductPage({
         />
       </div>
     </div>
+    </StorefrontChrome>
   );
 }

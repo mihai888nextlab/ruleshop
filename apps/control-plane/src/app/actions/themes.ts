@@ -11,6 +11,7 @@ import {
 import { requireStoreRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
+import { saveProductImage } from "@/lib/product-image-upload";
 import { getStoreBySlug } from "@/lib/store";
 
 /**
@@ -326,4 +327,20 @@ export async function duplicateTheme(slug: string, rawId: unknown) {
 /** Starting point for a new theme. */
 export async function defaultTokens() {
   return DEFAULT_THEME_TOKENS;
+}
+
+/**
+ * Uploads a hero image for the theme composer. Returns a path that may be
+ * stored in `tokens.heroImage` and served from the control plane.
+ */
+export async function uploadThemeHeroImage(
+  slug: string,
+  formData: FormData,
+): Promise<string> {
+  await adminContext(slug);
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Selectează o imagine");
+  }
+  return saveProductImage(slug, file);
 }

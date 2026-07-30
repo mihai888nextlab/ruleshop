@@ -19,6 +19,7 @@ out/
 
 # production
 build
+dist
 
 # misc
 .DS_Store
@@ -42,3 +43,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# uploaded product images (control plane)
+apps/control-plane/public/uploads/**
+!apps/control-plane/public/uploads/.gitkeep

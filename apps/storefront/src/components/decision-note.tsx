@@ -1,12 +1,4 @@
-import type { DecisionMeta, ExplanationStep } from "@ruleshop/contracts";
-
-/**
- * Makes rule decisions visible in the shop.
- *
- * The storefront receives every price with the decision that produced it, so it
- * can always account for what it shows. Two levels are offered: a one-line note
- * for lists, and a full trace for a product or order page.
- */
+import type { DecisionMeta, ExplanationStep } from "@/lib/types";
 
 function money(value: number): string {
   return new Intl.NumberFormat("ro-RO", {
@@ -18,7 +10,6 @@ function money(value: number): string {
 
 export { money };
 
-/** Compact note: which rules applied, and whether this was a canary cohort. */
 export function DecisionNote({
   decision,
   className = "",
@@ -45,13 +36,6 @@ export function DecisionNote({
   );
 }
 
-/**
- * Full evaluation trace.
- *
- * Rules that did not match are shown too, because "why did this *not* apply" is
- * as often the question as "why did it". Collapsed by default so it informs
- * without dominating the page.
- */
 export function DecisionTrace({
   title,
   decision,
@@ -61,7 +45,6 @@ export function DecisionTrace({
   title: string;
   decision: DecisionMeta;
   explanation?: ExplanationStep[];
-  /** Resulting figures worth showing beside the trace. */
   values?: { label: string; value: string }[];
 }) {
   const steps = explanation ?? decision.explanation ?? [];
@@ -126,9 +109,6 @@ export function DecisionTrace({
                   <span className="font-medium">{step.ruleName}</span>{" "}
                   <span className="text-xs text-[var(--muted)]">
                     ({step.ruleKey})
-                  </span>
-                  <span className="sr-only">
-                    {step.matched ? " — aplicată" : " — neaplicată"}
                   </span>
                   <span className="block text-xs text-[var(--muted)]">
                     {step.reason}

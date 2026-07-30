@@ -1,0 +1,40 @@
+---
+description: Control plane UI — clean minimal ops design (anti AI-slop)
+globs: apps/control-plane/**/*.{tsx,ts,css}
+alwaysApply: false
+---
+
+# Control plane UI
+
+Ops tool aesthetic: quiet, dense, readable. Not a marketing landing page.
+
+## Typography
+
+- One family only: **IBM Plex Sans**.
+- Headings: weight 600, tracking ≈ `-0.01em`.
+- No decorative page subtitles / eyebrows. Titles + actions only. Keep operational badges (status, version).
+
+## Color & surface
+
+- Flat backgrounds. No mesh/gradients/glow.
+- Neutrals first; accent charcoal for actions.
+- Borders: 1px `--border`.
+- **Squircles**: `--radius: 12px` + `corner-shape: squircle` (class `squircle` / `.panel`). No sharp 4px boxes, no `rounded-full` pills.
+
+## Components
+
+- Buttons / inputs / badges / panels: `rounded-[var(--radius)]` + `squircle`.
+- No page description blurbs under titles.
+- Data lists use `DataToolbar` (search + filters + sort).
+- Rule builder: left palette + right Scratch Dacă→Atunci C-block (`.rb-cblock`) with nested mouths. No dark full-page canvas.
+
+## Layout
+
+- Dashboard: dark sidebar (~240px) + light content.
+- Sidebar IA by intent: **Magazin** (ops) → **Decizii** (rules/schema/themes/evals) → **Laborator** (test/diff/AI/audit); live store in footer.
+- Prefer lists/tables over marketing grids.
+
+## Do not
+
+- Decorative subtitles that restate the feature.
+- AI-default looks (purple glow, cream+serif, oversized display fonts).
