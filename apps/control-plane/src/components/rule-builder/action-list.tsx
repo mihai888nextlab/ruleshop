@@ -125,11 +125,14 @@ export function ActionList({
   decisionType,
   onChange,
   errors,
+  themeKeys,
 }: {
   actions: Action[];
   decisionType: DecisionType;
   onChange: (next: Action[]) => void;
   errors: string[];
+  /** Themes this store has defined, so setTheme picks rather than types. */
+  themeKeys: string[];
 }) {
   const available = actionsForScope(decisionType);
 
@@ -191,6 +194,7 @@ export function ActionList({
               <ActionFields
                 action={action}
                 onChange={(next) => update(index, next)}
+                themeKeys={themeKeys}
               />
 
               <button
@@ -230,9 +234,11 @@ export function ActionList({
 function ActionFields({
   action,
   onChange,
+  themeKeys,
 }: {
   action: Action;
   onChange: (next: Action) => void;
+  themeKeys: string[];
 }) {
   switch (action.type) {
     case "discountPercent":
@@ -347,13 +353,35 @@ function ActionFields({
       );
 
     case "setTheme":
-      return (
-        <TextField
-          label="Temă"
-          value={action.themeId}
-          placeholder="ex. nord, circuit"
-          onChange={(themeId) => onChange({ ...action, themeId })}
-        />
+      // A select over defined themes: a mistyped key would resolve to nothing
+      // and silently leave the cohort on the default theme.
+      return themeKeys.length > 0 ? (
+        <label className="flex items-center gap-1 text-xs text-white/60">
+          Temă
+          <select
+            className={inputClass}
+            value={action.themeId}
+            onChange={(event) =>
+              onChange({ ...action, themeId: event.target.value })
+            }
+          >
+            <option value="">— alege —</option>
+            {themeKeys.map((key) => (
+              <option key={key} value={key}>
+                {key}
+              </option>
+            ))}
+            {action.themeId && !themeKeys.includes(action.themeId) && (
+              <option value={action.themeId}>
+                {action.themeId} (inexistentă)
+              </option>
+            )}
+          </select>
+        </label>
+      ) : (
+        <span className="text-xs text-amber-300/80">
+          Magazinul nu are teme definite — creează una în secțiunea Teme.
+        </span>
       );
 
     case "set":

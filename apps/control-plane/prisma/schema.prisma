@@ -86,6 +86,33 @@ model Store {
   aiSuggestions AiSuggestion[]
   attributeDefs CustomerAttributeDef[]
   profiles      CustomerProfile[]
+  themes        Theme[]
+}
+
+/// A visual theme composed by an administrator.
+///
+/// Themes are data rather than code: a `setTheme` rule names one by key, and the
+/// storefront applies its tokens as CSS custom properties. Adding a look, or
+/// changing which customers see it, needs no deploy.
+model Theme {
+  id      String @id @default(cuid())
+  storeId String
+  /// Referenced by setTheme rules. Immutable once rules may point at it.
+  key     String
+  name    String
+  /// Design tokens, validated against themeTokensSchema before every write.
+  /// Colours are hex literals and fonts are keys into a set the storefront has
+  /// already loaded, so a theme cannot inject CSS.
+  tokens  Json
+  /// Applied when no rule expresses a preference. At most one per store.
+  isDefault Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, key])
+  @@index([storeId, isDefault])
 }
 
 /// An administrator-defined customer field.

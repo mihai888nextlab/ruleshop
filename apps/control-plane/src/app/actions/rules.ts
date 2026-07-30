@@ -15,6 +15,37 @@ import {
   parseStringArray,
 } from "@/lib/store";
 
+/**
+ * Refuses a rule that selects a theme the store has not defined.
+ *
+ * The engine cannot check this — it only sees a string — but a mistyped key
+ * would resolve to nothing and silently leave the targeted cohort on the default
+ * theme, which looks like the rule simply not working.
+ */
+async function assertThemesExist(storeId: string, actions: Action[]) {
+  const wanted = [
+    ...new Set(
+      actions
+        .filter((action) => action.type === "setTheme")
+        .map((action) => (action as Extract<Action, { type: "setTheme" }>).themeId),
+    ),
+  ];
+  if (wanted.length === 0) return;
+
+  const existing = await prisma.theme.findMany({
+    where: { storeId, key: { in: wanted } },
+    select: { key: true },
+  });
+  const known = new Set(existing.map((row) => row.key));
+  const missing = wanted.filter((key) => !known.has(key));
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Tema ${missing.map((key) => `"${key}"`).join(", ")} nu există în acest magazin. Creează-o în secțiunea Teme.`,
+    );
+  }
+}
+
 async function ctx(slug: string, min: "OPERATOR" | "STORE_ADMIN" = "OPERATOR") {
   const store = await getStoreBySlug(slug);
   if (!store) throw new Error("Magazin inexistent");
@@ -109,6 +140,8 @@ export async function saveRuleInDraft(
   // attribute that has been archived.
   const v = validateRule(rule, { schema: await loadEditorSchema(store.id) });
   if (!v.ok || !v.data) throw new Error(v.errors.join("; "));
+
+  await assertThemesExist(store.id, v.data.actions);
 
   await prisma.rule.upsert({
     where: {

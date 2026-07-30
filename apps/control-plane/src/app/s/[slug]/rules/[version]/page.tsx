@@ -7,6 +7,7 @@ import { requireStoreRole } from "@/lib/auth";
 import { loadStoreAttributes, toFieldDef } from "@/lib/context-schema";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
+import { themeKeysFor } from "@/lib/theme-service";
 import { deleteRuleFromDraft, saveRuleInDraft } from "@/app/actions/rules";
 import { RuleEditorPanel } from "@/components/rule-builder/rule-editor-panel";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,9 @@ export default async function RulesetDetailPage({
   const defs = await loadStoreAttributes(store.id);
   const customFields = defs.map(toFieldDef);
   const schema = buildContextSchema(customFields);
+
+  // Themes this store defined, so a setTheme action picks from real ones.
+  const themeKeys = await themeKeysFor(store.id);
 
   /**
    * Rules competing for the same decision are grouped so the priority order is
@@ -140,6 +144,7 @@ export default async function RulesetDetailPage({
                   <div className="mt-3">
                     <RuleEditorPanel
                       customFields={customFields}
+                      themeKeys={themeKeys}
                       initial={{
                         key: rule.key,
                         name: rule.name,
@@ -172,6 +177,7 @@ export default async function RulesetDetailPage({
           <h2 className="display mb-2 text-2xl">Adaugă regulă</h2>
           <RuleEditorPanel
             customFields={customFields}
+            themeKeys={themeKeys}
             onSave={saveRuleInDraft.bind(null, slug, version)}
             openLabel="Deschide editorul vizual"
             startOpen={ruleset.rules.length === 0}

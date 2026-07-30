@@ -4,3 +4,4 @@ export * from "./catalog";
 export * from "./auth";
 export * from "./profile";
 export * from "./cart";
+export * from "./theme";

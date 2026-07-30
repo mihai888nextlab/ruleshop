@@ -72,12 +72,15 @@ function denormaliseRoot(conditions: Condition): Condition {
 
 export function RuleBuilder({
   customFields,
+  themeKeys = [],
   initial,
   onSave,
   onCancel,
 }: {
   /** Store-defined attributes; built-ins come from the engine. */
   customFields: FieldDef[];
+  /** Themes this store has defined, offered by the setTheme action. */
+  themeKeys?: string[];
   initial?: Partial<RuleDraft>;
   onSave: (rule: unknown) => Promise<void>;
   onCancel?: () => void;
@@ -297,6 +300,7 @@ export function RuleBuilder({
           decisionType={draft.category}
           onChange={(actions) => patch({ actions })}
           errors={classified.actionErrors}
+          themeKeys={themeKeys}
         />
       </div>
 

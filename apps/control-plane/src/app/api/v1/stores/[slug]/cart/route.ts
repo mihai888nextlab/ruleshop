@@ -18,6 +18,7 @@ import {
 import { buildCustomerFacts } from "@/lib/customer-facts";
 import { runDecision } from "@/lib/decide";
 import { findStoreBySlug } from "@/lib/storefront-read";
+import { resolveTheme } from "@/lib/theme-service";
 
 /**
  * The customer's cart for one store.
@@ -72,6 +73,8 @@ async function respondWithCart(
     persist: false,
   });
 
+  const resolvedTheme = await resolveTheme(store.id, theme.decision.themeId);
+
   const body = buildCartResponse({
     storeContext: {
       slug: store.slug,
@@ -81,6 +84,7 @@ async function respondWithCart(
           typeof theme.decision.themeId === "string"
             ? theme.decision.themeId
             : "default",
+        resolved: resolvedTheme,
         decision: {
           rulesetVersion: theme.rulesetVersion,
           matchedRules: theme.matchedRules,

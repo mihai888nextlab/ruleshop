@@ -74,6 +74,7 @@ async function main() {
   await prisma.ruleset.deleteMany();
   await prisma.deployment.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.theme.deleteMany();
   await prisma.customerProfile.deleteMany();
   await prisma.customerAttributeDef.deleteMany();
   await prisma.membership.deleteMany();
@@ -136,7 +137,7 @@ async function main() {
         category: "outerwear",
         basePrice: 899,
         stock: 12,
-        imageUrl: "/products/coat.svg",
+        imageUrl: "/products/coat.png",
       },
       {
         storeId: fashion.id,
@@ -146,7 +147,7 @@ async function main() {
         category: "dresses",
         basePrice: 349,
         stock: 25,
-        imageUrl: "/products/dress.svg",
+        imageUrl: "/products/dress.png",
       },
       {
         storeId: fashion.id,
@@ -156,7 +157,7 @@ async function main() {
         category: "shoes",
         basePrice: 429,
         stock: 40,
-        imageUrl: "/products/sneakers.svg",
+        imageUrl: "/products/sneakers.png",
       },
       {
         storeId: fashion.id,
@@ -166,7 +167,7 @@ async function main() {
         category: "accessories",
         basePrice: 129,
         stock: 60,
-        imageUrl: "/products/scarf.svg",
+        imageUrl: "/products/scarf.png",
       },
       {
         storeId: electronics.id,
@@ -176,7 +177,7 @@ async function main() {
         category: "computers",
         basePrice: 5499,
         stock: 8,
-        imageUrl: "/products/laptop.svg",
+        imageUrl: "/products/laptop.png",
       },
       {
         storeId: electronics.id,
@@ -186,7 +187,7 @@ async function main() {
         category: "audio",
         basePrice: 799,
         stock: 30,
-        imageUrl: "/products/headphones.svg",
+        imageUrl: "/products/headphones.png",
       },
       {
         storeId: electronics.id,
@@ -196,7 +197,7 @@ async function main() {
         category: "displays",
         basePrice: 1899,
         stock: 15,
-        imageUrl: "/products/monitor.svg",
+        imageUrl: "/products/monitor.png",
       },
       {
         storeId: electronics.id,
@@ -206,7 +207,7 @@ async function main() {
         category: "storage",
         basePrice: 649,
         stock: 50,
-        imageUrl: "/products/ssd.svg",
+        imageUrl: "/products/ssd.png",
       },
       {
         storeId: electronics.id,
@@ -216,7 +217,7 @@ async function main() {
         category: "network",
         basePrice: 999,
         stock: 0,
-        imageUrl: "/products/router.svg",
+        imageUrl: "/products/router.png",
       },
     ],
   });
@@ -399,6 +400,143 @@ async function main() {
    * Atelier Nord has no notion of a warranty plan, and Circuit Hub has no notion
    * of a preferred city.
    */
+
+  /**
+   * Themes as data.
+   *
+   * The `theme-nord` and `theme-circuit` rules seeded above select these by key.
+   * Editing one restyles the shop with no deploy, and pointing a rule at a
+   * different key hands a different look to a different cohort.
+   */
+  await prisma.theme.createMany({
+    data: [
+      {
+        storeId: fashion.id,
+        key: "nord",
+        name: "Atelier Nord",
+        isDefault: true,
+        tokens: {
+          colors: {
+            bg: "#ecefe9",
+            bgDeep: "#dce3d8",
+            fg: "#101612",
+            muted: "#5a635c",
+            surface: "#f6f8f5",
+            surface2: "#d5ddd4",
+            border: "#c0c9bf",
+            rule: "#1c2b24",
+            accent: "#1c2b24",
+            accentFg: "#eef3ef",
+            positive: "#2a5a42",
+            warning: "#8a5a12",
+            danger: "#8f2c2c",
+          },
+          fontDisplay: "syne",
+          fontBody: "figtree",
+          radius: 0,
+          displayTracking: -0.04,
+          displayWeight: 600,
+          density: "regular",
+          productRatio: "3 / 4",
+          heroOverlay: 0.78,
+        },
+      },
+      {
+        storeId: fashion.id,
+        key: "editorial",
+        name: "Editorial cald",
+        isDefault: false,
+        tokens: {
+          colors: {
+            bg: "#f7f3ec",
+            bgDeep: "#ece5d9",
+            fg: "#1c1710",
+            muted: "#6b6153",
+            surface: "#fffdf8",
+            surface2: "#eae2d4",
+            border: "#d6cbb6",
+            rule: "#3d2f1c",
+            accent: "#7a4b18",
+            accentFg: "#fdf8f0",
+            positive: "#2f5a3a",
+            warning: "#8a5a12",
+            danger: "#8f2c2c",
+          },
+          fontDisplay: "playfair",
+          fontBody: "lora",
+          radius: 4,
+          displayTracking: -0.015,
+          displayWeight: 500,
+          density: "airy",
+          productRatio: "4 / 5",
+          heroOverlay: 0.6,
+        },
+      },
+      {
+        storeId: fashion.id,
+        key: "midnight",
+        name: "Miezul nopții",
+        isDefault: false,
+        tokens: {
+          colors: {
+            bg: "#12131a",
+            bgDeep: "#0c0d12",
+            fg: "#f2f1ee",
+            muted: "#9a9aa8",
+            surface: "#1a1c25",
+            surface2: "#23262f",
+            border: "#34384a",
+            rule: "#c9b48a",
+            accent: "#c9b48a",
+            accentFg: "#12131a",
+            positive: "#6fcf9f",
+            warning: "#e0b357",
+            danger: "#e88b8b",
+          },
+          fontDisplay: "fraunces",
+          fontBody: "inter",
+          radius: 2,
+          displayTracking: -0.02,
+          displayWeight: 500,
+          density: "regular",
+          productRatio: "3 / 4",
+          heroOverlay: 0.85,
+        },
+      },
+      {
+        storeId: electronics.id,
+        key: "circuit",
+        name: "Circuit Hub",
+        isDefault: true,
+        tokens: {
+          colors: {
+            bg: "#e6ebf1",
+            bgDeep: "#d0d8e3",
+            fg: "#0e141c",
+            muted: "#5a6674",
+            surface: "#f3f6fa",
+            surface2: "#c9d3e0",
+            border: "#aeb9c8",
+            rule: "#0e141c",
+            accent: "#c45a0c",
+            accentFg: "#fff8f1",
+            positive: "#14503a",
+            warning: "#7d5210",
+            danger: "#8a2020",
+          },
+          fontDisplay: "spaceGrotesk",
+          fontBody: "inter",
+          radius: 0,
+          displayTracking: -0.055,
+          displayWeight: 700,
+          density: "compact",
+          productRatio: "1 / 1",
+          heroOverlay: 0.82,
+        },
+      },
+    ],
+  });
+
   await prisma.customerAttributeDef.createMany({
     data: [
       {
@@ -488,6 +626,25 @@ async function main() {
       priority: 30,
       conditions: { op: "eq", path: "product.category", value: "shoes" },
       actions: [{ type: "discountPercent", value: 5 }],
+    },
+    {
+      // The theme decision point, driven by a rule: VIP customers get a
+      // different look, chosen by key from the store's theme library.
+      key: "theme-vip-midnight",
+      name: "VIP vede tema Miezul nopții",
+      description: "Aspect distinct pentru clienții VIP",
+      category: "theme",
+      priority: 200,
+      conditions: { op: "eq", path: "customer.tier", value: "vip" },
+      actions: [{ type: "setTheme", themeId: "midnight" }],
+    },
+    {
+      key: "theme-nord-default",
+      name: "Temă implicită Atelier Nord",
+      category: "theme",
+      priority: 10,
+      conditions: { op: "exists", path: "store.slug" },
+      actions: [{ type: "setTheme", themeId: "nord" }],
     },
     {
       // Exercises a store-defined attribute, a nested group and a negation, so

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { explanationStepSchema } from "./decision";
+import { resolvedThemeSchema } from "./theme";
 
 /**
  * Catalog contracts.
@@ -23,8 +24,15 @@ export const decisionMetaSchema = z.object({
 
 export type DecisionMeta = z.infer<typeof decisionMetaSchema>;
 
+/**
+ * The theme in force for this request.
+ *
+ * Carries the resolved token values, not just an identifier, so the storefront
+ * can apply a theme an administrator composed without knowing it exists.
+ */
 export const themeSchema = z.object({
   themeId: z.string(),
+  resolved: resolvedThemeSchema,
   decision: decisionMetaSchema,
 });
 

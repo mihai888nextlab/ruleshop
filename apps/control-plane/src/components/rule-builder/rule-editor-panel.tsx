@@ -13,12 +13,14 @@ import { RuleBuilder, type RuleDraft } from "./rule-builder";
  */
 export function RuleEditorPanel({
   customFields,
+  themeKeys = [],
   initial,
   onSave,
   openLabel,
   startOpen = false,
 }: {
   customFields: FieldDef[];
+  themeKeys?: string[];
   initial?: Partial<RuleDraft>;
   onSave: (rule: unknown) => Promise<void>;
   openLabel: string;
@@ -37,6 +39,7 @@ export function RuleEditorPanel({
   return (
     <RuleBuilder
       customFields={customFields}
+      themeKeys={themeKeys}
       initial={initial}
       onSave={onSave}
       onCancel={() => setOpen(false)}

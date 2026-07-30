@@ -13,6 +13,7 @@ import {
   type ResolvedRuleset,
 } from "./decide";
 import { prisma } from "./prisma";
+import { resolveTheme } from "./theme-service";
 
 /**
  * Read side of the storefront API.
@@ -148,22 +149,31 @@ function toPricedProduct(
   };
 }
 
+/**
+ * Builds the store envelope, including the theme the rules selected.
+ *
+ * The resolved token values travel with the response rather than just a key, so
+ * the storefront can render a theme composed after it was deployed.
+ */
 async function themeContext(
+  storeId: string,
   storeSlug: string,
   storeName: string,
-  resolved: ResolvedRuleset,
   themeOutcome: Omit<DecisionOutcome, "evaluationId">,
 ): Promise<StoreContext> {
-  void resolved;
-  const themeId =
-    typeof themeOutcome.decision.themeId === "string"
-      ? themeOutcome.decision.themeId
-      : "default";
+  const decidedKey = themeOutcome.decision.themeId;
+  const resolvedTheme = await resolveTheme(storeId, decidedKey);
 
   return {
     slug: storeSlug,
     name: storeName,
-    theme: { themeId, decision: toDecisionMeta(themeOutcome, false) },
+    theme: {
+      // Retained for the `data-theme` attribute, which still drives the
+      // storefront's built-in fallback styling.
+      themeId: typeof decidedKey === "string" ? decidedKey : "default",
+      resolved: resolvedTheme,
+      decision: toDecisionMeta(themeOutcome, false),
+    },
   };
 }
 
@@ -255,7 +265,12 @@ export async function buildCatalog(input: {
   const themeOutcome = outcomes.get("theme")!;
 
   return {
-    store: await themeContext(store.slug, store.name, resolved, themeOutcome),
+    store: await themeContext(
+      store.id,
+      store.slug,
+      store.name,
+      themeOutcome,
+    ),
     products: products.map((product) =>
       toPricedProduct(
         product,
@@ -320,9 +335,9 @@ export async function buildProductDetail(input: {
 
   return {
     store: await themeContext(
+      store.id,
       store.slug,
       store.name,
-      resolved,
       outcomes.get("theme")!,
     ),
     product: toPricedProduct(
