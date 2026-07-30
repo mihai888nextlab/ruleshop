@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { LoyaltyCard } from "@/components/loyalty";
 import { ProfileForm } from "@/components/profile-form";
 import { getProfile } from "@/lib/api";
-import type { ProfileField } from "@/lib/types";
+import type { ProfileResponse } from "@/lib/types";
 import { useRuleShop } from "@/sdk/RuleShopProvider";
 
 export function ProfilePage() {
   const { authenticated } = useRuleShop();
-  const [fields, setFields] = useState<ProfileField[] | null>(null);
+  const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export function ProfilePage() {
         setError(result.error);
         return;
       }
-      setFields(result.data.fields);
+      setProfile(result.data);
     })();
     return () => {
       cancelled = true;
@@ -45,10 +46,13 @@ export function ProfilePage() {
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-5 py-10">
       <h1 className="display text-4xl">Profil</h1>
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
-      {fields === null ? (
+      {profile === null ? (
         <p className="text-sm text-[var(--muted)]">Se încarcă…</p>
       ) : (
-        <ProfileForm fields={fields} />
+        <>
+          <LoyaltyCard loyalty={profile.loyalty} />
+          <ProfileForm fields={profile.fields} />
+        </>
       )}
     </div>
   );

@@ -402,6 +402,10 @@ export function buildCartResponse(input: {
     viewer: {
       authenticated: input.identity.kind === "user",
       email: input.identity.kind === "user" ? input.identity.email : null,
+      // Straight from the facts the rules were evaluated against, so the balance
+      // the shop displays can never disagree with the decisions beside it.
+      loyaltyPoints: pricing.customer.loyaltyPoints,
+      tier: pricing.customer.tier,
     },
   };
 }

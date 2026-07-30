@@ -32,8 +32,30 @@ export const profileFieldSchema = z.object({
 
 export type ProfileField = z.infer<typeof profileFieldSchema>;
 
+/** Tier names the engine exposes at `customer.tier`. */
+export const customerTierSchema = z.enum(["guest", "standard", "vip"]);
+
+export type CustomerTier = z.infer<typeof customerTierSchema>;
+
+/**
+ * The customer's loyalty standing in this store.
+ *
+ * Carried with the profile because the balance is per store: the same account
+ * can be VIP in one shop and brand new in another, so a single global number
+ * would be wrong. `vipThreshold` ships with it so the shop can show how far off
+ * the next tier is without hard-coding a number the control plane owns.
+ */
+export const loyaltyBalanceSchema = z.object({
+  points: z.number().int(),
+  tier: customerTierSchema,
+  vipThreshold: z.number().int(),
+});
+
+export type LoyaltyBalance = z.infer<typeof loyaltyBalanceSchema>;
+
 export const profileResponseSchema = z.object({
   fields: z.array(profileFieldSchema),
+  loyalty: loyaltyBalanceSchema,
 });
 
 export type ProfileResponse = z.infer<typeof profileResponseSchema>;

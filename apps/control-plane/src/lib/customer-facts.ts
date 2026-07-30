@@ -1,3 +1,4 @@
+import type { CustomerTier, LoyaltyBalance } from "@ruleshop/contracts";
 import { prisma } from "./prisma";
 import type { ApiIdentity } from "./api-identity";
 
@@ -14,7 +15,24 @@ import type { ApiIdentity } from "./api-identity";
  * admin-defined customer attributes instead.
  */
 
-const VIP_POINTS_THRESHOLD = 400;
+export const VIP_POINTS_THRESHOLD = 400;
+
+/** Single definition of what a balance means, so no caller can drift from it. */
+export function tierForPoints(points: number): CustomerTier {
+  return points >= VIP_POINTS_THRESHOLD ? "vip" : "standard";
+}
+
+/**
+ * The balance as the storefront profile shows it. Signed-in callers only —
+ * a guest has no membership and therefore no standing to report.
+ */
+export function loyaltyBalance(points: number): LoyaltyBalance {
+  return {
+    points,
+    tier: tierForPoints(points),
+    vipThreshold: VIP_POINTS_THRESHOLD,
+  };
+}
 
 export interface CustomerFacts {
   isGuest: boolean;
@@ -22,7 +40,7 @@ export interface CustomerFacts {
   userId: string | null;
   email: string | null;
   loyaltyPoints: number;
-  tier: "guest" | "standard" | "vip";
+  tier: CustomerTier;
   orderCount: number;
   totalSpent: number;
   avgOrderValue: number;
@@ -91,7 +109,7 @@ export async function buildCustomerFacts(
     userId: user.id,
     email: user.email,
     loyaltyPoints,
-    tier: loyaltyPoints >= VIP_POINTS_THRESHOLD ? "vip" : "standard",
+    tier: tierForPoints(loyaltyPoints),
     orderCount,
     totalSpent,
     avgOrderValue: orderCount > 0 ? totalSpent / orderCount : 0,

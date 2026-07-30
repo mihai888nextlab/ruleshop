@@ -148,6 +148,17 @@ Each product includes `basePrice`, `finalPrice`, `discountPercent`, `available`,
 
 Response includes re-priced lines, `shippingOptions`, fraud preview, `viewer.authenticated`, and the current theme. Totals are server-computed.
 
+It also carries the loyalty decision for this cart:
+
+```json
+{
+  "loyalty": { "points": 50, "decision": { "matchedRules": ["loyalty-vip"], "…": "…" } },
+  "viewer": { "authenticated": true, "email": "…", "loyaltyPoints": 500, "tier": "vip" }
+}
+```
+
+`loyalty.points` is what the published rules **would** grant on checkout; `viewer.loyaltyPoints` is the balance already on the account, refreshed on every cart read so a header can show it without a second request.
+
 ### Checkout
 
 ```http
@@ -198,6 +209,17 @@ Order payloads include status, money fields, line items, and the decision traces
 | --- | --- | --- |
 | `GET` | `/profile` | Authenticated; dynamic fields from the store schema |
 | `PUT` | `/profile` | `{ "values": { "city": "Cluj", "newsletter": true } }` |
+
+`GET /profile` returns the store-defined `fields` plus the customer's loyalty standing:
+
+```json
+{
+  "fields": [ "…" ],
+  "loyalty": { "points": 500, "tier": "vip", "vipThreshold": 400 }
+}
+```
+
+Points are **per store** — the same account can be `vip` in one shop and `standard` in another. `vipThreshold` ships with the response so the shop can show the gap to the next tier without hard-coding it.
 
 `422` responses include per-field `errors` plus the updated `fields` list for inline form display.
 

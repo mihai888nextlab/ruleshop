@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { DecisionTrace, money } from "@/components/decision-note";
+import { points } from "@/components/loyalty";
 import { getOrder } from "@/lib/api";
 import type { OrderDetailResponse } from "@/lib/types";
 
@@ -62,6 +63,14 @@ export function OrderDetailPage() {
           <dt className="text-[var(--muted)]">Total</dt>
           <dd className="font-medium">{money(order.total)}</dd>
         </div>
+        <div>
+          <dt className="text-[var(--muted)]">Puncte primite</dt>
+          <dd className="font-medium">
+            {order.loyaltyPointsEarned > 0
+              ? points(order.loyaltyPointsEarned)
+              : "—"}
+          </dd>
+        </div>
       </dl>
 
       <div className="flex flex-col gap-1">
@@ -75,7 +84,7 @@ export function OrderDetailPage() {
           <DecisionTrace title="Fraudă" decision={decisions.fraud} />
         )}
         {decisions.loyalty && (
-          <DecisionTrace title="Loyalty" decision={decisions.loyalty} />
+          <DecisionTrace title="Loialitate" decision={decisions.loyalty} />
         )}
       </div>
     </div>
