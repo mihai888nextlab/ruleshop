@@ -4,10 +4,13 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
+import { PreferencesControls } from "@/components/preferences-controls";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 function LoginForm() {
+  const t = useT();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/";
@@ -26,7 +29,7 @@ function LoginForm() {
     });
     setLoading(false);
     if (res?.error) {
-      setError("Email sau parolă invalidă");
+      setError(t("auth.invalidCredentials"));
       return;
     }
     router.push(next);
@@ -38,18 +41,17 @@ function LoginForm() {
       onSubmit={onSubmit}
       className="w-full max-w-sm border border-[var(--border)] bg-[var(--surface)] p-6"
     >
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Autentificare
-      </h1>
-      <p className="mt-2 text-xs text-[var(--muted)]">
-        Demo: vip@demo.local / demo123 · admin@fashion.local / admin123
-      </p>
+      <div className="mb-4 flex justify-end">
+        <PreferencesControls />
+      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">{t("auth.title")}</h1>
+      <p className="mt-2 text-xs text-[var(--muted)]">{t("auth.demoHint")}</p>
       <label className="mt-5 flex flex-col gap-1 text-sm">
-        Email
+        {t("auth.email")}
         <Input name="email" type="email" required defaultValue="vip@demo.local" />
       </label>
       <label className="mt-3 flex flex-col gap-1 text-sm">
-        Parolă
+        {t("auth.password")}
         <Input
           name="password"
           type="password"
@@ -61,12 +63,12 @@ function LoginForm() {
         <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>
       )}
       <Button type="submit" disabled={loading} className="mt-5 w-full">
-        {loading ? "Se conectează…" : "Intră"}
+        {loading ? t("auth.signingIn") : t("auth.submit")}
       </Button>
       <p className="mt-4 text-sm text-[var(--muted)]">
-        Vrei un magazin?{" "}
+        {t("auth.wantStore")}{" "}
         <Link href="/register" className="underline">
-          Deschide un magazin
+          {t("auth.openStore")}
         </Link>
       </p>
     </form>

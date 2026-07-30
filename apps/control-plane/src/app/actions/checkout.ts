@@ -8,13 +8,15 @@ import { customerContext, storeLoyaltyPoints } from "@/lib/customer";
 import { runDecision } from "@/lib/decide";
 import { prisma } from "@/lib/prisma";
 import { getOrCreateGuestId, getStoreBySlug } from "@/lib/store";
+import { getTranslator } from "@/i18n/server";
 
 export async function placeOrder(
   slug: string,
   formData: FormData,
 ): Promise<{ error?: string }> {
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
-  if (!store) return { error: "Magazin inexistent" };
+  if (!store) return { error: t("errors.storeNotFound") };
 
   const session = await auth();
   const guestId = await getOrCreateGuestId();
@@ -23,7 +25,7 @@ export async function placeOrder(
     : `guest:${guestId}`;
 
   const cart = await getCartForStore(store.id);
-  if (cart.items.length === 0) return { error: "Coșul este gol" };
+  if (cart.items.length === 0) return { error: t("errors.cartEmpty") };
 
   const loyaltyPoints = await storeLoyaltyPoints(store.id, session?.user?.id);
   const customer = customerContext(session, loyaltyPoints);
@@ -120,7 +122,7 @@ export async function placeOrder(
   if (fraud.decision.blocked) {
     return {
       error:
-        String(fraud.decision.blockReason || "Comandă blocată de antifraudă") +
+        String(fraud.decision.blockReason || t("errors.fraudBlocked")) +
         ` [${fraud.traceId}]`,
     };
   }
@@ -145,13 +147,15 @@ export async function placeOrder(
     : String(formData.get("guestEmail") || "").trim() || null;
 
   if (!session?.user && !guestEmail) {
-    return { error: "Email necesar pentru comenzi guest" };
+    return { error: t("errors.guestEmailRequired") };
   }
 
   // stock check
   for (const item of cart.items) {
     if (item.product.stock < item.quantity) {
-      return { error: `Stoc insuficient pentru ${item.product.name}` };
+      return {
+        error: t("errors.insufficientStock", { name: item.product.name }),
+      };
     }
   }
 

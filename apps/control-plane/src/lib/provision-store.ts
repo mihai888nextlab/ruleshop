@@ -4,6 +4,7 @@ import { DEFAULT_THEME_TOKENS } from "@ruleshop/contracts";
 import { prisma } from "./prisma";
 import { issueStoreApiKey } from "./store-api-key";
 import { buildCloneCommand } from "./storefront-clone";
+import { getTranslator } from "@/i18n/server";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -41,9 +42,10 @@ export async function provisionStore(
   const slug = input.slug.trim().toLowerCase();
   const name = input.name.trim();
 
+  const t = await getTranslator();
   const existingStore = await prisma.store.findUnique({ where: { slug } });
   if (existingStore) {
-    return { ok: false, error: "Există deja un magazin cu acest slug", status: 409 };
+    return { ok: false, error: t("errors.slugTaken"), status: 409 };
   }
 
   let adminReused = false;
@@ -54,8 +56,7 @@ export async function provisionStore(
     if (!matches) {
       return {
         ok: false,
-        error:
-          "Există deja un cont cu acest email. Folosește parola corectă pentru a-i atașa magazinul, sau alege alt email.",
+        error: t("errors.emailExistsWrongPassword"),
         status: 409,
       };
     }

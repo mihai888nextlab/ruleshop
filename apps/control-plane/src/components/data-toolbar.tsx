@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useT } from "@/components/i18n-provider";
 import { Input } from "@/components/ui/input";
 
 export type ListFilter = {
@@ -17,7 +18,7 @@ export type ListSort = {
 export function DataToolbar({
   search,
   onSearchChange,
-  searchPlaceholder = "Caută…",
+  searchPlaceholder,
   filters = [],
   filterValues,
   onFilterChange,
@@ -43,14 +44,17 @@ export function DataToolbar({
   showCount?: boolean;
   actions?: ReactNode;
 }) {
+  const t = useT();
+  const placeholder = searchPlaceholder ?? t("common.searchPlaceholder");
+
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <Input
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
-        placeholder={searchPlaceholder}
+        placeholder={placeholder}
         className="sm:max-w-xs"
-        aria-label="Căutare"
+        aria-label={t("common.search")}
       />
       {filters.map((filter) => (
         <select
@@ -60,7 +64,9 @@ export function DataToolbar({
           aria-label={filter.label}
           className="squircle rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm"
         >
-          <option value="">{filter.label}: toate</option>
+          <option value="">
+            {t("common.filterAll", { filter: filter.label })}
+          </option>
           {filter.options.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -72,7 +78,7 @@ export function DataToolbar({
         <select
           value={sort ?? sorts[0]?.value}
           onChange={(e) => onSortChange?.(e.target.value)}
-          aria-label="Sortare"
+          aria-label={t("common.sort")}
           className="squircle rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm"
         >
           {sorts.map((opt) => (

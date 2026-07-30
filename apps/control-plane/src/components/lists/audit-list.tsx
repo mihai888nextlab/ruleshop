@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/i18n-provider";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 
 export type AuditListItem = {
@@ -13,6 +14,7 @@ export type AuditListItem = {
 };
 
 export function AuditList({ logs }: { logs: AuditListItem[] }) {
+  const t = useT();
   const actions = [...new Set(logs.map((l) => l.action))].sort();
 
   const list = useListQuery({
@@ -38,20 +40,20 @@ export function AuditList({ logs }: { logs: AuditListItem[] }) {
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută în audit…"
+        searchPlaceholder={t("audit.search")}
         filters={[
           {
             key: "action",
-            label: "Acțiune",
+            label: t("audit.action"),
             options: actions.map((a) => ({ value: a, label: a })),
           },
         ]}
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "dateDesc", label: "Dată ↓" },
-          { value: "dateAsc", label: "Dată ↑" },
-          { value: "action", label: "Acțiune" },
+          { value: "dateDesc", label: t("audit.sortDateDesc") },
+          { value: "dateAsc", label: t("audit.sortDateAsc") },
+          { value: "action", label: t("audit.action") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -61,14 +63,14 @@ export function AuditList({ logs }: { logs: AuditListItem[] }) {
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          Niciun rezultat
+          {t("common.noResults")}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {list.filtered.map((l) => (
             <li key={l.id} className="panel px-3 py-2 text-sm">
               <span className="text-[var(--muted)]">
-                {new Date(l.createdAt).toLocaleString("ro-RO")}
+                {new Date(l.createdAt).toLocaleString()}
               </span>{" "}
               · <strong>{l.action}</strong>
               {l.entity && (

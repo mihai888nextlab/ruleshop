@@ -2,39 +2,56 @@
 
 import { useState, useTransition } from "react";
 import { rotateStoreKeyAction } from "@/app/actions/stores";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 
-function placeholderClone(apiUrl: string, degitSource: string, apiKey?: string) {
-  return [
-    `npx degit ${degitSource} my-store`,
-    `cd my-store`,
-    `cp .env.example .env`,
-    `# VITE_RULESHOP_API_URL=${apiUrl}`,
-    `# VITE_RULESHOP_API_KEY=${apiKey ?? "<cheia-ta>"}`,
-    `npm i && npm run dev`,
-  ].join("\n");
+const STOREFRONT_ORIGIN = "http://localhost:3008";
+
+function placeholderDocker(
+  apiUrl: string,
+  image: string,
+  apiKey = "<cheia-ta>",
+) {
+  const run = [
+    "docker run --rm -p 3008:80",
+    `-e RULESHOP_API_URL=${apiUrl}`,
+    `-e RULESHOP_API_KEY=${apiKey}`,
+    image,
+  ].join(" ");
+  return `docker pull ${image} && ${run}`;
 }
 
 export function ConnectionPanel({
   slug,
   apiUrl,
   degitSource,
+  storefrontImage,
   keys,
 }: {
   slug: string;
   apiUrl: string;
   degitSource: string;
+  storefrontImage: string;
   keys: { id: string; name: string; keyPrefix: string; createdAt: Date }[];
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [freshKey, setFreshKey] = useState<string | null>(null);
-  const [cloneCommand, setCloneCommand] = useState<string | null>(null);
+  const [dockerCommand, setDockerCommand] = useState<string | null>(null);
+  const [degitCommand, setDegitCommand] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"docker" | "key" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const active = keys[0];
-  const displayCommand =
-    cloneCommand ??
-    placeholderClone(apiUrl, degitSource, freshKey ?? undefined);
+  const displayDocker =
+    dockerCommand ??
+    placeholderDocker(apiUrl, storefrontImage, freshKey ?? undefined);
+
+  async function copy(text: string, which: "docker" | "key") {
+    await navigator.clipboard.writeText(text);
+    setCopied(which);
+    window.setTimeout(() => setCopied(null), 2000);
+  }
 
   function onRotate() {
     setError(null);
@@ -45,21 +62,19 @@ export function ConnectionPanel({
         return;
       }
       setFreshKey(result.apiKey);
-      setCloneCommand(result.cloneCommand);
+      setDockerCommand(result.cloneCommand);
+      setDegitCommand(result.degitCommand);
     });
   }
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <div className="panel flex flex-col gap-3 p-5">
-        <h2 className="text-lg font-semibold">Cheie API storefront</h2>
-        <p className="text-sm text-[var(--muted)]">
-          Storefront-ul Vite trimite această cheie pe fiecare cerere. Nu
-          încredința niciodată un storeId din client.
-        </p>
+        <h2 className="text-lg font-semibold">{t("connection.apiKeyTitle")}</h2>
+        <p className="text-sm text-[var(--muted)]">{t("connection.apiKeyHelp")}</p>
         {active ? (
           <p className="text-sm">
-            Activă:{" "}
+            {t("connection.active")}{" "}
             <code className="rounded bg-[var(--surface-2)] px-2 py-0.5 text-xs">
               {active.keyPrefix}…
             </code>{" "}
@@ -68,20 +83,20 @@ export function ConnectionPanel({
             </span>
           </p>
         ) : (
-          <p className="text-sm text-[var(--warning)]">Nicio cheie activă.</p>
+          <p className="text-sm text-[var(--warn)]">{t("connection.noKey")}</p>
         )}
 
         {freshKey && (
           <div className="flex flex-col gap-2 rounded border border-[var(--border)] bg-[var(--surface-2)] p-3">
-            <p className="text-sm font-medium">Cheie nouă (copiază acum)</p>
+            <p className="text-sm font-medium">{t("connection.freshKey")}</p>
             <code className="break-all text-xs">{freshKey}</code>
             <Button
               type="button"
               size="sm"
               className="self-start"
-              onClick={() => void navigator.clipboard.writeText(freshKey)}
+              onClick={() => void copy(freshKey, "key")}
             >
-              Copiază cheia
+              {copied === "key" ? t("common.copied") : t("connection.copyKey")}
             </Button>
           </div>
         )}
@@ -99,25 +114,58 @@ export function ConnectionPanel({
           onClick={onRotate}
           className="self-start"
         >
-          {pending ? "Se regeneră…" : "Regenerează cheia"}
+          {pending ? t("connection.rotating") : t("connection.rotate")}
         </Button>
+        {!freshKey && (
+          <p className="text-xs text-[var(--muted)]">{t("connection.rotateHint")}</p>
+        )}
       </div>
 
       <div className="panel flex flex-col gap-3 p-5">
-        <h2 className="text-lg font-semibold">Clone storefront</h2>
-        <pre className="overflow-x-auto rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
-          {displayCommand}
+        <h2 className="text-lg font-semibold">{t("connection.startTitle")}</h2>
+        <p className="text-sm text-[var(--muted)]">
+          {t("connection.startHelp", {
+            storefront: STOREFRONT_ORIGIN,
+            api: apiUrl,
+          })}
+        </p>
+        <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
+          {displayDocker}
         </pre>
         <Button
           type="button"
           size="sm"
-          variant="outline"
           className="self-start"
-          onClick={() => void navigator.clipboard.writeText(displayCommand)}
+          disabled={!freshKey && !dockerCommand}
+          title={
+            !freshKey && !dockerCommand
+              ? t("connection.needRotateTitle")
+              : undefined
+          }
+          onClick={() => void copy(displayDocker, "docker")}
         >
-          Copiază comanda
+          {copied === "docker" ? t("common.copied") : t("connection.copyDocker")}
         </Button>
+        {!freshKey && !dockerCommand && (
+          <p className="text-xs text-[var(--muted)]">
+            {t("connection.placeholderHint")}
+          </p>
+        )}
       </div>
+
+      {degitCommand && (
+        <details className="panel p-5 text-sm">
+          <summary className="cursor-pointer font-medium">
+            {t("connection.degitAlt")}
+          </summary>
+          <pre className="mt-3 overflow-x-auto rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
+            {degitCommand}
+          </pre>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            {t("connection.source")} <code>{degitSource}</code>
+          </p>
+        </details>
+      )}
     </div>
   );
 }

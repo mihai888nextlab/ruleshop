@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useT } from "@/components/i18n-provider";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export function RulesetList({
   onRollback: (version: number) => Promise<void>;
   onToggleKill: (version: number, killed: boolean) => Promise<void>;
 }) {
+  const t = useT();
   const list = useListQuery({
     items: rulesets,
     searchText: (r) => `${r.version} ${r.status}`,
@@ -52,11 +54,11 @@ export function RulesetList({
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută versiune…"
+        searchPlaceholder={t("rules.searchVersion")}
         filters={[
           {
             key: "status",
-            label: "Status",
+            label: t("rules.status"),
             options: [
               { value: "draft", label: "draft" },
               { value: "published", label: "published" },
@@ -68,9 +70,9 @@ export function RulesetList({
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "versionDesc", label: "Versiune ↓" },
-          { value: "versionAsc", label: "Versiune ↑" },
-          { value: "status", label: "Status" },
+          { value: "versionDesc", label: t("rules.sortVersionDesc") },
+          { value: "versionAsc", label: t("rules.sortVersionAsc") },
+          { value: "status", label: t("rules.status") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -80,7 +82,7 @@ export function RulesetList({
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          Niciun rezultat
+          {t("common.noResults")}
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -94,7 +96,7 @@ export function RulesetList({
                   href={`/s/${slug}/rules/${rs.version}`}
                   className="text-xl font-semibold tracking-tight hover:underline"
                 >
-                  Versiunea {rs.version}
+                  {t("rules.versionN", { n: rs.version })}
                 </Link>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Badge
@@ -108,9 +110,11 @@ export function RulesetList({
                   >
                     {rs.status}
                   </Badge>
-                  <Badge tone="muted">{rs.ruleCount} reguli</Badge>
+                  <Badge tone="muted">
+                    {t("rules.rulesCount", { n: rs.ruleCount })}
+                  </Badge>
                   {rs.killed && (
-                    <Badge tone="warn">oprită prin kill switch</Badge>
+                    <Badge tone="warn">{t("rules.killedBySwitch")}</Badge>
                   )}
                 </div>
               </div>
@@ -125,14 +129,14 @@ export function RulesetList({
                     size="sm"
                     variant={rs.killed ? "danger" : "ghost"}
                   >
-                    {rs.killed ? "Reactivează" : "Kill"}
+                    {rs.killed ? t("rules.reactivate") : t("rules.kill")}
                   </Button>
                 </form>
                 <Link
                   href={`/s/${slug}/rules/diff?a=${rs.version}&b=${stableVersion ?? rs.version}`}
                 >
                   <Button variant="ghost" size="sm">
-                    Diff
+                    {t("nav.diff")}
                   </Button>
                 </Link>
                 {rs.status === "draft" && (
@@ -143,7 +147,7 @@ export function RulesetList({
                       }}
                     >
                       <Button type="submit" size="sm">
-                        Publică stable
+                        {t("rules.publishStable")}
                       </Button>
                     </form>
                     <form
@@ -152,7 +156,7 @@ export function RulesetList({
                       }}
                     >
                       <Button type="submit" size="sm" variant="outline">
-                        Canary 20%
+                        {t("rules.canary20")}
                       </Button>
                     </form>
                   </>
@@ -164,7 +168,7 @@ export function RulesetList({
                     }}
                   >
                     <Button type="submit" size="sm" variant="secondary">
-                      Rollback aici
+                      {t("rules.rollbackHere")}
                     </Button>
                   </form>
                 )}

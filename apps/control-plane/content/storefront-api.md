@@ -53,7 +53,7 @@ Configure the control plane origin your shop will call (CORS):
 
 ```env
 # apps/control-plane/.env
-STOREFRONT_ORIGIN="http://localhost:3000"
+STOREFRONT_ORIGIN="http://localhost:3008"
 CONTROL_PLANE_PUBLIC_URL="http://localhost:3001"
 ```
 

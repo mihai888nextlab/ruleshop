@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import type { DecisionType } from "@ruleshop/engine";
+import { useT } from "@/components/i18n-provider";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { SuggestionCard, type SuggestionView } from "./suggestion-card";
@@ -15,13 +16,13 @@ import { SuggestionCard, type SuggestionView } from "./suggestion-card";
  * behind it are computed here.
  */
 
-const CATEGORIES: { value: DecisionType; label: string }[] = [
-  { value: "pricing", label: "Preț și reduceri" },
-  { value: "shipping", label: "Livrare" },
-  { value: "fraud", label: "Antifraudă" },
-  { value: "availability", label: "Disponibilitate" },
-  { value: "loyalty", label: "Loialitate" },
-  { value: "theme", label: "Temă" },
+const CATEGORY_VALUES: DecisionType[] = [
+  "pricing",
+  "shipping",
+  "fraud",
+  "availability",
+  "loyalty",
+  "theme",
 ];
 
 export interface AiConsoleActions {
@@ -54,6 +55,15 @@ export function AiConsole({
   liveVersion: number | null;
   aiConfigured: boolean;
 }) {
+  const t = useT();
+  const categories = useMemo(
+    () =>
+      CATEGORY_VALUES.map((value) => ({
+        value,
+        label: t(`rules.categories.${value}`),
+      })),
+    [t],
+  );
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -74,7 +84,7 @@ export function AiConsole({
       try {
         await fn();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Operațiune eșuată");
+        setError(cause instanceof Error ? cause.message : t("common.operationFailed"));
       }
     });
   }
@@ -86,11 +96,7 @@ export function AiConsole({
     <div className="flex flex-col gap-6">
       {!aiConfigured && (
         <p className="panel border-l-4 border-l-amber-500 p-4 text-sm">
-          <strong>GEMINI_API_KEY nu este configurat.</strong> Analiza
-          statistică, detectarea regulilor redundante și simularea pe istoric
-          funcționează în continuare — sunt calculate de aplicație. Doar
-          explicațiile în limbaj natural și generarea de reguli din text au nevoie
-          de model.
+          {t("ai.geminiBanner")}
         </p>
       )}
 
@@ -103,11 +109,9 @@ export function AiConsole({
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="panel flex flex-col gap-3 p-4">
           <div>
-            <h2 className="font-medium">Analizează versiunea publicată</h2>
+            <h2 className="font-medium">{t("ai.analyzePublished")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Caută reguli neutilizate, duplicate, contradictorii, umbrite de
-              altele sau imposibil de îndeplinit — plus reguli care se potrivesc
-              dar pierd mereu conflictul de prioritate, deci nu schimbă nimic.
+              {t("ai.analyzeDesc")}
             </p>
           </div>
           <Button
@@ -116,21 +120,20 @@ export function AiConsole({
             className="self-start"
             onClick={() => run(actions.analyze)}
           >
-            Analizează
+            {t("ai.analyze")}
           </Button>
         </section>
 
         <section className="panel flex flex-col gap-3 p-4">
           <div>
-            <h2 className="font-medium">Explică diferențele dintre versiuni</h2>
+            <h2 className="font-medium">{t("ai.explainDiffs")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Descrie în limbaj natural ce s-ar schimba pentru clienți dacă o
-              versiune ar fi publicată.
+              {t("ai.explainDesc")}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-sm">
-              De la
+              {t("ai.from")}
               <select
                 className={selectClass}
                 value={diffFrom}
@@ -139,13 +142,13 @@ export function AiConsole({
                 {versions.map((version) => (
                   <option key={version} value={version}>
                     v{version}
-                    {version === liveVersion ? " (live)" : ""}
+                    {version === liveVersion ? ` ${t("ai.live")}` : ""}
                   </option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              La
+              {t("ai.to")}
               <select
                 className={selectClass}
                 value={diffTo}
@@ -154,7 +157,7 @@ export function AiConsole({
                 {versions.map((version) => (
                   <option key={version} value={version}>
                     v{version}
-                    {version === liveVersion ? " (live)" : ""}
+                    {version === liveVersion ? ` ${t("ai.live")}` : ""}
                   </option>
                 ))}
               </select>
@@ -165,33 +168,32 @@ export function AiConsole({
               disabled={pending || !aiConfigured}
               onClick={() => run(() => actions.explainDiff(diffFrom, diffTo))}
             >
-              Explică
+              {t("ai.explain")}
             </Button>
           </div>
         </section>
 
         <section className="panel flex flex-col gap-3 p-4">
           <div>
-            <h2 className="font-medium">Generează o regulă din text</h2>
+            <h2 className="font-medium">{t("ai.generateFromText")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Modelul primește schema magazinului, deci poate folosi doar câmpuri
-              care există. Rezultatul este validat înainte de a ajunge la analiză.
+              {t("ai.generateDesc")}
             </p>
           </div>
           <label className="flex flex-col gap-1 text-sm">
-            Cerință
+            {t("ai.requirement")}
             <textarea
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               rows={3}
               maxLength={1000}
-              placeholder="ex. clienții din Cluj abonați la newsletter primesc 15% la paltoane"
+              placeholder={t("ai.generatePlaceholder")}
               className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
             />
           </label>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-sm">
-              Tip de decizie
+              {t("ai.decisionType")}
               <select
                 className={selectClass}
                 value={category}
@@ -199,7 +201,7 @@ export function AiConsole({
                   setCategory(event.target.value as DecisionType)
                 }
               >
-                {CATEGORIES.map((option) => (
+                {categories.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -211,23 +213,21 @@ export function AiConsole({
               disabled={pending || !aiConfigured || prompt.trim().length < 8}
               onClick={() => run(() => actions.propose(prompt.trim(), category))}
             >
-              Propune regula
+              {t("ai.proposeRule")}
             </Button>
           </div>
         </section>
 
         <section className="panel flex flex-col gap-3 p-4">
           <div>
-            <h2 className="font-medium">Simulează o versiune candidat</h2>
+            <h2 className="font-medium">{t("ai.simulateCandidate")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Reia evaluările reale prin regulile unei versiuni nepublicate și
-              compară metricile cu versiunea live. Calculat de aplicație —
-              funcționează și fără cheie de API.
+              {t("ai.simulateDesc")}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-sm">
-              Versiune candidat
+              {t("ai.candidateVersion")}
               <select
                 className={selectClass}
                 value={candidateVersion}
@@ -238,7 +238,7 @@ export function AiConsole({
                 {versions.map((version) => (
                   <option key={version} value={version}>
                     v{version}
-                    {version === liveVersion ? " (live)" : ""}
+                    {version === liveVersion ? ` ${t("ai.live")}` : ""}
                   </option>
                 ))}
               </select>
@@ -248,24 +248,21 @@ export function AiConsole({
               disabled={pending || candidateVersion === liveVersion}
               onClick={() => run(() => actions.simulateVersion(candidateVersion))}
             >
-              Simulează
+              {t("ai.simulate")}
             </Button>
           </div>
           {candidateVersion === liveVersion && (
             <p className="text-xs text-[var(--muted)]">
-              Versiunea publicată este propria referință; alege alta pentru a
-              compara.
+              {t("ai.liveReferenceHint")}
             </p>
           )}
         </section>
 
         <section className="panel flex flex-col gap-3 p-4">
           <div>
-            <h2 className="font-medium">Triază incidentele antifraudă</h2>
+            <h2 className="font-medium">{t("ai.triageFraud")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Pornește de la comenzile blocate real. Aplicația calculează rata de
-              blocare, valoarea refuzată și clienții blocați deși au comenzi
-              plătite; modelul doar clasifică fiecare incident.
+              {t("ai.triageDesc")}
             </p>
           </div>
           <Button
@@ -275,21 +272,20 @@ export function AiConsole({
             className="self-start"
             onClick={() => run(actions.triageFraud)}
           >
-            Triază
+            {t("ai.triage")}
           </Button>
         </section>
 
         <section className="panel flex flex-col gap-3 p-4">
           <div>
-            <h2 className="font-medium">Propune o îmbunătățire</h2>
+            <h2 className="font-medium">{t("ai.proposeImprovement")}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Pornește de la constatările aplicației pentru o regulă publicată,
-              apoi simulează automat propunerea pe evaluările reale.
+              {t("ai.improveDesc")}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1 text-sm">
-              Regulă
+              {t("ai.rule")}
               <select
                 className={selectClass}
                 value={improveKey}
@@ -308,7 +304,7 @@ export function AiConsole({
               disabled={pending || !aiConfigured || !improveKey}
               onClick={() => run(() => actions.improve(improveKey))}
             >
-              Propune
+              {t("ai.propose")}
             </Button>
           </div>
         </section>
@@ -316,18 +312,14 @@ export function AiConsole({
 
       <section>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="text-xs text-[var(--muted)]">Sugestii</h2>
+          <h2 className="text-xs text-[var(--muted)]">{t("ai.suggestions")}</h2>
           <Badge tone="muted">{suggestions.length}</Badge>
-          <span className="text-xs text-[var(--muted)]">
-            Aprobarea creează un draft — publicarea rămâne o acțiune umană
-            separată.
-          </span>
+          <span className="text-xs text-[var(--muted)]">{t("ai.draftNote")}</span>
         </div>
 
         {suggestions.length === 0 ? (
           <p className="panel p-6 text-sm text-[var(--muted)]">
-            Nicio sugestie încă. Începe cu „Analizează”, care funcționează și
-            fără cheie de API.
+            {t("ai.noSuggestionsHint")}
           </p>
         ) : (
           <ul className="flex flex-col gap-4">

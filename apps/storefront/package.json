@@ -5,10 +5,10 @@
   "type": "module",
   "description": "Blank Vite storefront bound to one store via RuleShop API key. Static hosting only — talks to the control plane over HTTP.",
   "scripts": {
-    "dev": "vite --port 3000",
+    "dev": "vite --port 3008",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --port 3000",
-    "start": "vite preview --port 3000",
+    "preview": "vite preview --port 3008",
+    "start": "vite preview --port 3008",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

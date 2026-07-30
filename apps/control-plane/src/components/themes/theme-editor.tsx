@@ -9,6 +9,7 @@ import {
   type ThemeColors,
   type ThemeTokens,
 } from "@ruleshop/contracts";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ThemePreview } from "./theme-preview";
@@ -22,18 +23,19 @@ import { ThemePreview } from "./theme-preview";
  * component.
  */
 
-const DENSITY_LABELS: Record<ThemeTokens["density"], string> = {
-  compact: "Compact",
-  regular: "Normal",
-  airy: "Aerisit",
-};
-
 /** Grouped so the panel reads as design decisions, not a flat list of fields. */
-const COLOR_GROUPS: { label: string; keys: (keyof ThemeColors)[] }[] = [
-  { label: "Bază", keys: ["bg", "fg", "muted"] },
-  { label: "Suprafețe", keys: ["surface", "surface2", "border"] },
-  { label: "Accent", keys: ["accent", "accentFg"] },
-  { label: "Semnale", keys: ["positive", "warning", "danger"] },
+const COLOR_GROUP_KEYS: {
+  labelKey:
+    | "themes.colorBase"
+    | "themes.colorSurfaces"
+    | "themes.colorAccent"
+    | "themes.colorSignals";
+  keys: (keyof ThemeColors)[];
+}[] = [
+  { labelKey: "themes.colorBase", keys: ["bg", "fg", "muted"] },
+  { labelKey: "themes.colorSurfaces", keys: ["surface", "surface2", "border"] },
+  { labelKey: "themes.colorAccent", keys: ["accent", "accentFg"] },
+  { labelKey: "themes.colorSignals", keys: ["positive", "warning", "danger"] },
 ];
 
 export function ThemeEditor({
@@ -58,6 +60,7 @@ export function ThemeEditor({
   /** Uploads via FormData (`image` file field) and returns `/uploads/...`. */
   onUploadHero: (formData: FormData) => Promise<string>;
 }) {
+  const t = useT();
   const [key, setKey] = useState(initialKey);
   const [name, setName] = useState(initialName);
   const [tokens, setTokens] = useState<ThemeTokens>(initialTokens);
@@ -94,7 +97,7 @@ export function ThemeEditor({
     } catch (cause) {
       setLocalPreview(null);
       setError(
-        cause instanceof Error ? cause.message : "Încărcarea imaginii a eșuat",
+        cause instanceof Error ? cause.message : t("themes.uploadFailed"),
       );
     } finally {
       setUploading(false);
@@ -108,7 +111,7 @@ export function ThemeEditor({
       await onSave({ key: key.trim(), name: name.trim(), tokens });
       setSaved(true);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Salvarea a eșuat");
+      setError(cause instanceof Error ? cause.message : t("themes.saveFailed"));
     } finally {
       setPending(false);
     }
@@ -122,40 +125,35 @@ export function ThemeEditor({
       <div className="flex flex-col gap-5">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className={labelClass}>
-            <span className="font-medium">Nume</span>
+            <span className="font-medium">{t("themes.name")}</span>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={60}
-              placeholder="Ediție de iarnă"
+              placeholder={t("themes.namePlaceholder")}
             />
           </label>
 
           <label className={labelClass}>
-            <span className="font-medium">Cheie</span>
+            <span className="font-medium">{t("themes.key")}</span>
             <Input
               value={key}
               onChange={(event) => setKey(event.target.value)}
               disabled={!isNew}
               pattern="[a-z][a-z0-9-]*"
-              placeholder="iarna"
+              placeholder={t("themes.keyPlaceholder")}
             />
             <span className="text-xs text-[var(--muted)]">
-              {isNew
-                ? "Folosită de reguli prin acțiunea setTheme."
-                : "Nu se poate schimba: regulile publicate o folosesc."}
+              {isNew ? t("themes.keyHintNew") : t("themes.keyHintLocked")}
             </span>
           </label>
         </div>
 
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Hero catalog
+            {t("themes.hero")}
           </h3>
-          <p className="text-xs text-[var(--muted)]">
-            Imaginea de pe prima pagină a magazinului. Fără imagine, hero-ul
-            rămâne mineral (doar culori).
-          </p>
+          <p className="text-xs text-[var(--muted)]">{t("themes.heroHelp")}</p>
           {heroSrc && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -185,14 +183,14 @@ export function ThemeEditor({
                 patch({ heroImage: null });
               }}
             >
-              Elimină imaginea
+              {t("themes.removeImage")}
             </Button>
           )}
           {uploading && (
-            <p className="text-xs text-[var(--muted)]">Se încarcă…</p>
+            <p className="text-xs text-[var(--muted)]">{t("common.loading")}</p>
           )}
           <RangeRow
-            label="Întunecare pe imagine"
+            label={t("themes.overlay")}
             value={tokens.heroOverlay}
             min={0}
             max={1}
@@ -206,11 +204,11 @@ export function ThemeEditor({
 
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Culori
+            {t("themes.colors")}
           </h3>
-          {COLOR_GROUPS.map((group) => (
-            <div key={group.label} className="flex flex-col gap-2">
-              <p className="text-xs text-[var(--muted)]">{group.label}</p>
+          {COLOR_GROUP_KEYS.map((group) => (
+            <div key={group.labelKey} className="flex flex-col gap-2">
+              <p className="text-xs text-[var(--muted)]">{t(group.labelKey)}</p>
               {group.keys.map((colorKey) => (
                 <ColorRow
                   key={colorKey}
@@ -225,11 +223,11 @@ export function ThemeEditor({
 
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Tipografie
+            {t("themes.typography")}
           </h3>
 
           <label className={labelClass}>
-            <span>Font titluri</span>
+            <span>{t("themes.displayFont")}</span>
             <select
               value={tokens.fontDisplay}
               onChange={(event) =>
@@ -249,7 +247,7 @@ export function ThemeEditor({
           </label>
 
           <label className={labelClass}>
-            <span>Font text</span>
+            <span>{t("themes.bodyFont")}</span>
             <select
               value={tokens.fontBody}
               onChange={(event) =>
@@ -266,7 +264,7 @@ export function ThemeEditor({
           </label>
 
           <RangeRow
-            label="Grosime titluri"
+            label={t("themes.headingWeight")}
             value={tokens.displayWeight}
             min={300}
             max={900}
@@ -276,7 +274,7 @@ export function ThemeEditor({
           />
 
           <RangeRow
-            label="Spațiere titluri"
+            label={t("themes.headingTracking")}
             value={tokens.displayTracking}
             min={-0.06}
             max={0.12}
@@ -290,11 +288,11 @@ export function ThemeEditor({
 
         <section className="flex flex-col gap-3">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Formă și ritm
+            {t("themes.shapeRhythm")}
           </h3>
 
           <RangeRow
-            label="Rotunjire colțuri"
+            label={t("themes.radius")}
             value={tokens.radius}
             min={0}
             max={24}
@@ -304,11 +302,15 @@ export function ThemeEditor({
           />
 
           <div className="flex flex-col gap-1 text-sm">
-            <span>Densitate</span>
+            <span>{t("themes.density")}</span>
             <div className="flex gap-2">
               {(
-                Object.keys(DENSITY_LABELS) as ThemeTokens["density"][]
-              ).map((option) => (
+                [
+                  ["compact", "themes.densityCompact"],
+                  ["regular", "themes.densityRegular"],
+                  ["airy", "themes.densityAiry"],
+                ] as const
+              ).map(([option, labelKey]) => (
                 <button
                   key={option}
                   type="button"
@@ -320,7 +322,7 @@ export function ThemeEditor({
                       : "border-[var(--border)] hover:border-[var(--accent)]")
                   }
                 >
-                  {DENSITY_LABELS[option]}
+                  {t(labelKey)}
                 </button>
               ))}
             </div>
@@ -330,7 +332,7 @@ export function ThemeEditor({
         {error && (
           <p
             role="alert"
-            className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+            className="rounded-[var(--radius)] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]"
           >
             {error}
           </p>
@@ -338,29 +340,31 @@ export function ThemeEditor({
 
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" onClick={save} disabled={pending || uploading}>
-            {pending ? "Se salvează…" : isNew ? "Creează tema" : "Salvează"}
+            {pending
+              ? t("common.saving")
+              : isNew
+                ? t("themes.create")
+                : t("common.save")}
           </Button>
           {onCancel && (
             <Button type="button" variant="ghost" onClick={onCancel}>
-              Renunță
+              {t("common.cancel")}
             </Button>
           )}
           {saved && (
-            <span className="text-sm text-emerald-700">
-              Salvat. Regulile care selectează această temă o aplică imediat.
-            </span>
+            <span className="text-sm text-emerald-700">{t("themes.savedHint")}</span>
           )}
         </div>
       </div>
 
       <div className="lg:sticky lg:top-6">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-          Previzualizare
+          {t("themes.preview")}
         </p>
-        <ThemePreview tokens={tokens} storeName={name || "Magazin"} />
+        <ThemePreview tokens={tokens} storeName={name || t("nav.store")} />
         <details className="mt-3">
           <summary className="cursor-pointer text-xs text-[var(--muted)]">
-            Variabilele CSS generate
+            {t("themes.cssVars")}
           </summary>
           <pre className="mt-2 max-h-56 overflow-auto rounded bg-[var(--surface-2)] p-2 text-xs">
             {Object.entries(themeToCssVars(tokens))

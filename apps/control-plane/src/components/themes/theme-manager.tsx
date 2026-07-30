@@ -5,6 +5,7 @@ import {
   DEFAULT_THEME_TOKENS,
   type ThemeTokens,
 } from "@ruleshop/contracts";
+import { useT } from "@/components/i18n-provider";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { AddButton, Modal } from "../ui/modal";
@@ -51,6 +52,7 @@ export function ThemeManager({
   themes: ThemeRow[];
   actions: ThemeActions;
 }) {
+  const t = useT();
   const [creating, setCreating] = useState(themes.length === 0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -62,7 +64,9 @@ export function ThemeManager({
       try {
         await fn();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Operațiune eșuată");
+        setError(
+          cause instanceof Error ? cause.message : t("common.operationFailed"),
+        );
       }
     });
   }
@@ -74,7 +78,7 @@ export function ThemeManager({
       {error && (
         <p
           role="alert"
-          className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-[var(--radius)] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]"
         >
           {error}
         </p>
@@ -83,7 +87,7 @@ export function ThemeManager({
       {editing && (
         <section className="panel p-5">
           <h2 className="mb-4 text-lg font-semibold tracking-tight">
-            Editează „{editing.name}”
+            {t("themes.editTitle", { name: editing.name })}
           </h2>
           <ThemeEditor
             isNew={false}
@@ -106,20 +110,20 @@ export function ThemeManager({
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
-            Teme definite
+            {t("themes.defined")}
             <span className="text-sm font-normal tabular-nums text-[var(--muted)]">
               {themes.length}
             </span>
           </h2>
           <AddButton
-            label="Adaugă temă"
+            label={t("themes.add")}
             onClick={() => setCreating(true)}
           />
         </div>
 
         {themes.length === 0 ? (
           <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
-            Nicio temă definită.
+            {t("themes.empty")}
           </p>
         ) : (
           <ul className="grid gap-5 lg:grid-cols-2">
@@ -130,9 +134,11 @@ export function ThemeManager({
                   <code className="rounded bg-[var(--surface-2)] px-1.5 py-0.5 text-xs">
                     {theme.key}
                   </code>
-                  {theme.isDefault && <Badge tone="ok">implicită</Badge>}
+                  {theme.isDefault && (
+                    <Badge tone="ok">{t("themes.defaultBadge")}</Badge>
+                  )}
                   {theme.usedBy.some((use) => use.live) && (
-                    <Badge tone="accent">activă în reguli</Badge>
+                    <Badge tone="accent">{t("themes.activeInRules")}</Badge>
                   )}
                 </div>
 
@@ -140,11 +146,14 @@ export function ThemeManager({
 
                 <p className="text-xs text-[var(--muted)]">
                   {theme.usedBy.length === 0
-                    ? "Nicio regulă nu selectează această temă."
-                    : `Selectată de: ${theme.usedBy
-                        .map(
-                          (use) =>
-                            `${use.ruleKey} (v${use.rulesetVersion}${use.live ? ", live" : ""})`,
+                    ? t("themes.noRuleSelects")
+                    : `${t("themes.selectedBy")} ${theme.usedBy
+                        .map((use) =>
+                          t("themes.ruleUsage", {
+                            ruleKey: use.ruleKey,
+                            version: use.rulesetVersion,
+                            live: use.live ? t("themes.liveSuffix") : "",
+                          }),
                         )
                         .join(", ")}`}
                 </p>
@@ -159,7 +168,9 @@ export function ThemeManager({
                       setEditingId(editingId === theme.id ? null : theme.id)
                     }
                   >
-                    {editingId === theme.id ? "Închide" : "Editează"}
+                    {editingId === theme.id
+                      ? t("common.close")
+                      : t("common.edit")}
                   </Button>
                   <Button
                     type="button"
@@ -168,7 +179,7 @@ export function ThemeManager({
                     disabled={pending}
                     onClick={() => run(() => actions.duplicate(theme.id))}
                   >
-                    Duplică
+                    {t("themes.duplicate")}
                   </Button>
                   {!theme.isDefault && (
                     <Button
@@ -178,7 +189,7 @@ export function ThemeManager({
                       disabled={pending}
                       onClick={() => run(() => actions.setDefault(theme.id))}
                     >
-                      Setează implicită
+                      {t("themes.setDefault")}
                     </Button>
                   )}
                   <DeleteButton
@@ -197,8 +208,8 @@ export function ThemeManager({
         onClose={() => {
           if (themes.length > 0) setCreating(false);
         }}
-        title="Temă nouă"
-        className="max-w-lg"
+        title={t("themes.newTitle")}
+        className="max-h-[min(90vh,800px)] max-w-3xl"
       >
         <ThemeEditor
           isNew
@@ -226,6 +237,7 @@ function DeleteButton({
   onConfirm: () => void;
   disabled: boolean;
 }) {
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
 
   if (!confirming) {
@@ -237,7 +249,7 @@ function DeleteButton({
         disabled={disabled}
         onClick={() => setConfirming(true)}
       >
-        Șterge
+        {t("common.delete")}
       </Button>
     );
   }
@@ -253,7 +265,7 @@ function DeleteButton({
         onConfirm();
       }}
     >
-      Confirmă ștergerea
+      {t("common.confirmDelete")}
     </Button>
   );
 }

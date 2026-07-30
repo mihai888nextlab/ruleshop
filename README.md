@@ -19,7 +19,7 @@ npm run db:seed
 npm run dev
 ```
 
-Deschide [http://localhost:3000](http://localhost:3000).
+Deschide [http://localhost:3008](http://localhost:3008).
 
 ### Conturi demo
 

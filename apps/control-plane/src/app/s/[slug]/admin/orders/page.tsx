@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { updateOrderStatus } from "@/app/actions/admin";
 import { PageHeader } from "@/components/dashboard/shell";
 import { OrderList } from "@/components/lists/order-list";
+import { getTranslator } from "@/i18n/server";
 import { requireStoreRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
@@ -17,6 +18,8 @@ export default async function AdminOrdersPage({
   const authz = await requireStoreRole(store.id, "OPERATOR");
   if (!authz.ok) redirect(`/login?next=/s/${slug}/admin/orders`);
 
+  const t = await getTranslator();
+
   const orders = await prisma.order.findMany({
     where: { storeId: store.id },
     orderBy: { createdAt: "desc" },
@@ -26,11 +29,11 @@ export default async function AdminOrdersPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Comenzi" />
+      <PageHeader title={t("orders.title")} />
 
       {orders.length === 0 ? (
         <div className="panel px-5 py-12 text-center text-sm text-[var(--muted)]">
-          Nicio comandă încă.
+          {t("orders.empty")}
         </div>
       ) : (
         <OrderList

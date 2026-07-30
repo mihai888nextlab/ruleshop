@@ -6,6 +6,7 @@ import { formatRon } from "@/lib/utils";
 import { removeCartItem, updateCartItem } from "@/app/actions/cart";
 import { Button } from "@/components/ui/button";
 import { StorefrontChrome } from "@/components/storefront-chrome";
+import { getTranslator } from "@/i18n/server";
 
 export default async function CartPage({
   params,
@@ -13,6 +14,7 @@ export default async function CartPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
   const cart = await getCartForStore(store.id);
@@ -21,12 +23,14 @@ export default async function CartPage({
   return (
     <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="flex flex-col gap-6">
-      <h1 className="font-semibold tracking-tight text-3xl">Coș</h1>
+      <h1 className="font-semibold tracking-tight text-3xl">
+        {t("storefront.cart")}
+      </h1>
       {cart.items.length === 0 ? (
         <p className="text-[var(--muted)]">
-          Coșul este gol.{" "}
+          {t("storefront.cartEmpty")}{" "}
           <Link href={`/s/${slug}`} className="text-[var(--accent)] underline">
-            Continuă cumpărăturile
+            {t("storefront.continueShopping")}
           </Link>
         </p>
       ) : (
@@ -79,7 +83,7 @@ export default async function CartPage({
                       }}
                     >
                       <Button type="submit" variant="ghost" size="sm">
-                        Șterge
+                        {t("storefront.remove")}
                       </Button>
                     </form>
                   </div>
@@ -89,11 +93,11 @@ export default async function CartPage({
           </ul>
           <div className="flex items-center justify-between border-t border-[var(--border)] pt-4">
             <p className="text-lg">
-              Subtotal (preț de bază):{" "}
+              {t("storefront.subtotal")}{" "}
               <strong>{formatRon(subtotal)}</strong>
             </p>
             <Link href={`/s/${slug}/checkout`}>
-              <Button size="lg">Checkout</Button>
+              <Button size="lg">{t("storefront.checkout")}</Button>
             </Link>
           </div>
         </>

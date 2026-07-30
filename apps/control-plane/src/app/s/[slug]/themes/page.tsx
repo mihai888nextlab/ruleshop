@@ -15,6 +15,7 @@ import {
 } from "@/components/themes/theme-manager";
 import { Button } from "@/components/ui/button";
 import { requireStoreRole } from "@/lib/auth";
+import { getTranslator } from "@/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 import { listThemes, parseTokens } from "@/lib/theme-service";
@@ -37,6 +38,8 @@ export default async function ThemesPage({
 
   const authz = await requireStoreRole(store.id, "STORE_ADMIN");
   if (!authz.ok) redirect(`/login?next=/s/${slug}/themes`);
+
+  const t = await getTranslator();
 
   const liveVersion = store.deployment?.stableVersion ?? null;
 
@@ -96,24 +99,21 @@ export default async function ThemesPage({
           href={`/s/${slug}/rules`}
           className="text-sm text-[var(--muted)] hover:underline"
         >
-          ← Control plane
+          {t("common.backControlPlane")}
         </Link>
-        <h1 className="font-semibold tracking-tight mt-1 text-3xl">Teme</h1>
-        <p className="mt-2 max-w-2xl text-[var(--muted)]">
-          O temă este un set de valori de design, nu cod. Regulile de tip{" "}
-          <strong>temă</strong> aleg una după cheie, iar magazinul o aplică
-          imediat — deci poți schimba aspectul, sau cine îl vede, fără nicio
-          modificare în aplicație.
-        </p>
+        <h1 className="font-semibold tracking-tight mt-1 text-3xl">
+          {t("themes.title")}
+        </h1>
+        <p className="mt-2 max-w-2xl text-[var(--muted)]">{t("themes.intro")}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href={`/s/${slug}/rules`}>
             <Button variant="outline" size="sm">
-              Reguli de temă
+              {t("themes.rulesLink")}
             </Button>
           </Link>
           <Link href={`/s/${slug}/attributes`}>
             <Button variant="outline" size="sm">
-              Schema clientului
+              {t("themes.schemaLink")}
             </Button>
           </Link>
         </div>
@@ -121,9 +121,7 @@ export default async function ThemesPage({
 
       {orphanKeys.length > 0 && (
         <p className="rounded-[var(--radius)] border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Reguli selectează teme care nu există:{" "}
-          <strong>{orphanKeys.join(", ")}</strong>. Clienții din acele grupuri
-          primesc tema implicită. Creează temele lipsă sau corectează regulile.
+          {t("themes.orphanWarningDetail", { keys: orphanKeys.join(", ") })}
         </p>
       )}
 

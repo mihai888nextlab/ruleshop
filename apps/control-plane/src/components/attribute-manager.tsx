@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { OPERATORS_BY_TYPE, customAttributePath } from "@ruleshop/engine";
 import type { FieldType } from "@ruleshop/engine";
+import { useT } from "@/components/i18n-provider";
+import type { TranslateFn } from "@/i18n/dictionary";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -29,13 +31,21 @@ export interface AttributeRow {
   archived: boolean;
 }
 
-const TYPES: { value: FieldType; label: string; hint: string }[] = [
-  { value: "string", label: "Text", hint: "nume, cod, observație" },
-  { value: "number", label: "Număr", hint: "vârstă, recomandări, prag" },
-  { value: "boolean", label: "Da / Nu", hint: "abonat, acceptă marketing" },
-  { value: "enum", label: "Listă de opțiuni", hint: "oraș, plan, segment" },
-  { value: "date", label: "Dată", hint: "zi de naștere, dată înscriere" },
+const FIELD_TYPES: FieldType[] = [
+  "string",
+  "number",
+  "boolean",
+  "enum",
+  "date",
 ];
+
+function attributeTypes(t: TranslateFn) {
+  return FIELD_TYPES.map((value) => ({
+    value,
+    label: t(`attributes.types.${value}`),
+    hint: t(`attributes.typeHints.${value}`),
+  }));
+}
 
 type Actions = {
   onCreate: (input: unknown) => Promise<{ id: string }>;
@@ -51,6 +61,8 @@ export function AttributeManager({
   attributes: AttributeRow[];
   actions: Actions;
 }) {
+  const t = useT();
+  const types = useMemo(() => attributeTypes(t), [t]);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -60,7 +72,9 @@ export function AttributeManager({
       try {
         await fn();
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Operațiune eșuată");
+        setError(
+          cause instanceof Error ? cause.message : t("common.operationFailed"),
+        );
       }
     });
   }
@@ -94,7 +108,7 @@ export function AttributeManager({
       {error && (
         <p
           role="alert"
-          className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-[var(--radius)] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]"
         >
           {error}
         </p>
@@ -102,7 +116,7 @@ export function AttributeManager({
 
       <section className="flex flex-col gap-3">
         <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
-          Atribute definite
+          {t("attributes.defined")}
           <span className="text-sm font-normal tabular-nums text-[var(--muted)]">
             {list.resultCount === list.totalCount
               ? list.totalCount
@@ -113,31 +127,31 @@ export function AttributeManager({
         <DataToolbar
           search={list.search}
           onSearchChange={list.setSearch}
-          searchPlaceholder="Caută atribut…"
+          searchPlaceholder={t("attributes.search")}
           filters={[
             {
               key: "type",
-              label: "Tip",
-              options: TYPES.map((t) => ({
-                value: t.value,
-                label: t.label,
+              label: t("attributes.type"),
+              options: types.map((type) => ({
+                value: type.value,
+                label: type.label,
               })),
             },
             {
               key: "status",
-              label: "Stare",
+              label: t("attributes.status"),
               options: [
-                { value: "active", label: "Active" },
-                { value: "archived", label: "Arhivate" },
+                { value: "active", label: t("attributes.active") },
+                { value: "archived", label: t("attributes.archived") },
               ],
             },
           ]}
           filterValues={list.filterValues}
           onFilterChange={list.setFilter}
           sorts={[
-            { value: "label", label: "Etichetă" },
-            { value: "key", label: "Cheie" },
-            { value: "type", label: "Tip" },
+            { value: "label", label: t("attributes.sortLabel") },
+            { value: "key", label: t("attributes.sortKey") },
+            { value: "type", label: t("attributes.type") },
           ]}
           sort={list.sort}
           onSortChange={list.setSort}
@@ -146,7 +160,7 @@ export function AttributeManager({
           showCount={false}
           actions={
             <AddButton
-              label="Adaugă atribut"
+              label={t("attributes.add")}
               onClick={() => setCreating(true)}
             />
           }
@@ -154,11 +168,11 @@ export function AttributeManager({
 
         {attributes.length === 0 ? (
           <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] p-6 text-sm text-[var(--muted)]">
-            Niciun atribut definit.
+            {t("attributes.empty")}
           </p>
         ) : list.filtered.length === 0 ? (
           <p className="py-6 text-center text-sm text-[var(--muted)]">
-            Niciun rezultat
+            {t("common.noResults")}
           </p>
         ) : (
           <ul className="flex flex-col gap-3">
@@ -166,6 +180,7 @@ export function AttributeManager({
               <AttributeCard
                 key={attribute.id}
                 attribute={attribute}
+                types={types}
                 disabled={pending}
                 onUpdate={(input) =>
                   run(() => actions.onUpdate(attribute.id, input))
@@ -183,9 +198,10 @@ export function AttributeManager({
       <Modal
         open={creating}
         onClose={() => setCreating(false)}
-        title="Atribut nou"
+        title={t("attributes.newTitle")}
       >
         <NewAttributeForm
+          types={types}
           disabled={pending}
           onSubmit={(input) => {
             run(async () => {
@@ -211,12 +227,15 @@ function slugifyKey(label: string): string {
 }
 
 function NewAttributeForm({
+  types,
   onSubmit,
   disabled,
 }: {
+  types: ReturnType<typeof attributeTypes>;
   onSubmit: (input: unknown) => void;
   disabled: boolean;
 }) {
+  const t = useT();
   const [label, setLabel] = useState("");
   const [key, setKey] = useState("");
   const [keyTouched, setKeyTouched] = useState(false);
@@ -252,7 +271,7 @@ function NewAttributeForm({
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="grid grid-cols-2 gap-3"
       onSubmit={(e) => {
         e.preventDefault();
         if (!canSubmit || disabled) return;
@@ -269,7 +288,7 @@ function NewAttributeForm({
       }}
     >
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Etichetă</span>
+        <span className="font-medium">{t("attributes.label")}</span>
         <Input
           value={label}
           onChange={(e) => {
@@ -284,7 +303,7 @@ function NewAttributeForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Cheie</span>
+        <span className="font-medium">{t("attributes.key")}</span>
         <Input
           value={key}
           onChange={(e) => {
@@ -308,39 +327,39 @@ function NewAttributeForm({
           </span>
         ) : key.length > 0 ? (
           <span className="text-xs text-[var(--danger)]">
-            Litere mici, cifre și _; începe cu o literă.
+            {t("attributes.keyInvalid")}
           </span>
         ) : null}
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Tip</span>
+        <span className="font-medium">{t("attributes.type")}</span>
         <select
           value={type}
           onChange={(e) => setType(e.target.value as FieldType)}
           className="squircle rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm"
         >
-          {TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          {types.map((typeOption) => (
+            <option key={typeOption.value} value={typeOption.value}>
+              {typeOption.label}
             </option>
           ))}
         </select>
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="font-medium">Descriere</span>
+        <span className="font-medium">{t("attributes.description")}</span>
         <Input
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Opțional"
+          placeholder={t("common.optional")}
           maxLength={300}
         />
       </label>
 
       {type === "enum" && (
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Opțiuni</span>
+        <label className="col-span-2 flex flex-col gap-1 text-sm">
+          <span className="font-medium">{t("attributes.options")}</span>
           <Input
             value={optionsText}
             onChange={(e) => setOptionsText(e.target.value)}
@@ -350,14 +369,14 @@ function NewAttributeForm({
         </label>
       )}
 
-      <div className="flex flex-col gap-3 text-sm">
+      <div className="col-span-2 flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={showOnProfile}
             onChange={(e) => setShowOnProfile(e.target.checked)}
           />
-          În profil
+          {t("attributes.onProfile")}
         </label>
         <label className="flex items-center gap-2">
           <input
@@ -365,16 +384,16 @@ function NewAttributeForm({
             checked={required}
             onChange={(e) => setRequired(e.target.checked)}
           />
-          Obligatoriu
+          {t("attributes.required")}
         </label>
       </div>
 
       <Button
         type="submit"
         disabled={disabled || !canSubmit}
-        className="self-start"
+        className="col-span-2 self-start"
       >
-        Adaugă
+        {t("common.add")}
       </Button>
     </form>
   );
@@ -382,21 +401,25 @@ function NewAttributeForm({
 
 function AttributeCard({
   attribute,
+  types,
   onUpdate,
   onArchive,
   onDelete,
   disabled,
 }: {
   attribute: AttributeRow;
+  types: ReturnType<typeof attributeTypes>;
   onUpdate: (input: unknown) => void;
   onArchive: (archived: boolean) => void;
   onDelete: () => void;
   disabled: boolean;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const typeLabel =
-    TYPES.find((t) => t.value === attribute.type)?.label ?? attribute.type;
+    types.find((typeOption) => typeOption.value === attribute.type)?.label ??
+    attribute.type;
 
   return (
     <li
@@ -410,11 +433,15 @@ function AttributeCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-medium">{attribute.label}</h3>
             <Badge tone="accent">{typeLabel}</Badge>
-            {attribute.required && <Badge tone="warn">obligatoriu</Badge>}
-            {!attribute.showOnProfile && (
-              <Badge tone="muted">ascuns în profil</Badge>
+            {attribute.required && (
+              <Badge tone="warn">{t("attributes.requiredBadge")}</Badge>
             )}
-            {attribute.archived && <Badge tone="muted">arhivat</Badge>}
+            {!attribute.showOnProfile && (
+              <Badge tone="muted">{t("attributes.hiddenBadge")}</Badge>
+            )}
+            {attribute.archived && (
+              <Badge tone="muted">{t("attributes.archivedBadge")}</Badge>
+            )}
           </div>
 
           {attribute.description && (
@@ -428,7 +455,8 @@ function AttributeCard({
           </p>
 
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Operatori: {OPERATORS_BY_TYPE[attribute.type].join(", ")}
+            {t("attributes.operators")}{" "}
+            {OPERATORS_BY_TYPE[attribute.type].join(", ")}
           </p>
 
           {attribute.type === "enum" && attribute.options.length > 0 && (
@@ -449,7 +477,7 @@ function AttributeCard({
             disabled={disabled}
             onClick={() => setEditing((v) => !v)}
           >
-            {editing ? "Anulează" : "Editează"}
+            {editing ? t("common.cancel") : t("common.edit")}
           </Button>
           <Button
             variant="secondary"
@@ -457,7 +485,9 @@ function AttributeCard({
             disabled={disabled}
             onClick={() => onArchive(!attribute.archived)}
           >
-            {attribute.archived ? "Restaurează" : "Arhivează"}
+            {attribute.archived
+              ? t("attributes.restore")
+              : t("attributes.archive")}
           </Button>
           {confirmingDelete ? (
             <Button
@@ -469,7 +499,7 @@ function AttributeCard({
                 onDelete();
               }}
             >
-              Confirmă ștergerea
+              {t("common.confirmDelete")}
             </Button>
           ) : (
             <Button
@@ -478,7 +508,7 @@ function AttributeCard({
               disabled={disabled}
               onClick={() => setConfirmingDelete(true)}
             >
-              Șterge
+              {t("common.delete")}
             </Button>
           )}
         </div>
@@ -507,17 +537,17 @@ function AttributeCard({
           }}
         >
           <label className="flex flex-col gap-1 text-sm">
-            Etichetă
+            {t("attributes.label")}
             <Input name="label" defaultValue={attribute.label} required />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Descriere
+            {t("attributes.description")}
             <Input name="description" defaultValue={attribute.description} />
           </label>
 
           {attribute.type === "enum" && (
             <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-              Opțiuni (separate prin virgulă)
+              {t("attributes.optionsHint")}
               <Input
                 name="options"
                 defaultValue={attribute.options.join(", ")}
@@ -533,7 +563,7 @@ function AttributeCard({
                 name="showOnProfile"
                 defaultChecked={attribute.showOnProfile}
               />
-              Vizibil în profil
+              {t("attributes.visibleOnProfile")}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -541,17 +571,16 @@ function AttributeCard({
                 name="required"
                 defaultChecked={attribute.required}
               />
-              Obligatoriu
+              {t("attributes.required")}
             </label>
           </div>
 
           <p className="text-xs text-[var(--muted)] sm:col-span-2">
-            Cheia și tipul nu pot fi modificate: regulile publicate depind de
-            ambele. Pentru alt tip, creează un atribut nou.
+            {t("attributes.immutableNote")}
           </p>
 
           <Button type="submit" size="sm" disabled={disabled} className="self-start">
-            Salvează
+            {t("common.save")}
           </Button>
         </form>
       )}

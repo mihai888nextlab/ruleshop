@@ -8,13 +8,17 @@ import {
   type AnalyticsRange,
 } from "@/lib/analytics";
 import { requireStoreRole } from "@/lib/auth";
+import { getTranslator } from "@/i18n/server";
 import { getStoreBySlug } from "@/lib/store";
 import { cn, formatRon } from "@/lib/utils";
 
-const RANGES: { value: AnalyticsRange; label: string }[] = [
-  { value: "7", label: "7 zile" },
-  { value: "30", label: "30 zile" },
-  { value: "all", label: "Tot" },
+const RANGE_KEYS: {
+  value: AnalyticsRange;
+  labelKey: "analytics.days7" | "analytics.days30" | "analytics.allTime";
+}[] = [
+  { value: "7", labelKey: "analytics.days7" },
+  { value: "30", labelKey: "analytics.days30" },
+  { value: "all", labelKey: "analytics.allTime" },
 ];
 
 export default async function AnalyticsPage({
@@ -32,6 +36,7 @@ export default async function AnalyticsPage({
   const authz = await requireStoreRole(store.id, "OPERATOR");
   if (!authz.ok) redirect(`/login?next=/s/${slug}/admin/analytics`);
 
+  const t = await getTranslator();
   const range = parseAnalyticsRange(rangeRaw);
   const data = await getStoreAnalytics(store.id, range);
   const maxDayCount = Math.max(1, ...data.ordersOverTime.map((d) => d.count));
@@ -42,10 +47,10 @@ export default async function AnalyticsPage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Analitică"
+        title={t("analytics.title")}
         actions={
           <div className="flex flex-wrap gap-1">
-            {RANGES.map((r) => (
+            {RANGE_KEYS.map((r) => (
               <Link
                 key={r.value}
                 href={`/s/${slug}/admin/analytics?range=${r.value}`}
@@ -56,7 +61,7 @@ export default async function AnalyticsPage({
                     : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]",
                 )}
               >
-                {r.label}
+                {t(r.labelKey)}
               </Link>
             ))}
           </div>
@@ -64,26 +69,31 @@ export default async function AnalyticsPage({
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Comenzi" value={data.orderCount} />
-        <StatCard label="Venit" value={formatRon(data.revenue)} />
-        <StatCard label="AOV" value={formatRon(data.aov)} />
-        <StatCard label="Evaluări" value={data.evaluationCount} />
+        <StatCard label={t("nav.orders")} value={data.orderCount} />
+        <StatCard label={t("analytics.revenue")} value={formatRon(data.revenue)} />
+        <StatCard label={t("analytics.aov")} value={formatRon(data.aov)} />
+        <StatCard label={t("analytics.evaluations")} value={data.evaluationCount} />
       </div>
 
       <section className="panel p-5">
         <h2 className="text-lg font-semibold tracking-tight">
-          Canary vs stable
+          {t("analytics.canaryVsStable")}
         </h2>
         {data.evaluationCount === 0 ? (
           <p className="mt-4 text-sm text-[var(--muted)]">
-            Nicio evaluare în interval.
+            {t("analytics.noEvals")}
           </p>
         ) : (
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Badge tone="warn">
-              canary {data.canaryCount} ({data.canaryPercent.toFixed(0)}%)
+              {t("analytics.canaryPercent", {
+                count: data.canaryCount,
+                percent: data.canaryPercent.toFixed(0),
+              })}
             </Badge>
-            <Badge tone="muted">stable {data.stableCount}</Badge>
+            <Badge tone="muted">
+              {t("analytics.stableCount", { count: data.stableCount })}
+            </Badge>
             <div className="h-2 min-w-[12rem] flex-1 overflow-hidden rounded-[var(--radius)] bg-[var(--surface-2)]">
               <div
                 className="h-full bg-[var(--accent)]"
@@ -97,11 +107,11 @@ export default async function AnalyticsPage({
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="panel p-5">
           <h2 className="text-lg font-semibold tracking-tight">
-            Produse vândute
+            {t("analytics.soldProducts")}
           </h2>
           {data.bestSellers.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              Nicio vânzare în interval.
+              {t("analytics.noSales")}
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-[var(--border)]">
@@ -115,7 +125,7 @@ export default async function AnalyticsPage({
                     {p.name}
                   </span>
                   <span className="tabular-nums text-[var(--muted)]">
-                    {p.quantity} buc · {formatRon(p.revenue)}
+                    {p.quantity} {t("analytics.units")} · {formatRon(p.revenue)}
                   </span>
                 </li>
               ))}
@@ -125,11 +135,11 @@ export default async function AnalyticsPage({
 
         <section className="panel p-5">
           <h2 className="text-lg font-semibold tracking-tight">
-            Comenzi pe status
+            {t("analytics.ordersByStatus")}
           </h2>
           {data.ordersByStatus.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              Nicio comandă în interval.
+              {t("analytics.noOrders")}
             </p>
           ) : (
             <ul className="mt-4 flex flex-col gap-2">
@@ -151,11 +161,11 @@ export default async function AnalyticsPage({
 
       <section className="panel p-5">
         <h2 className="text-lg font-semibold tracking-tight">
-          Comenzi în timp
+          {t("analytics.ordersOverTime")}
         </h2>
         {data.ordersOverTime.length === 0 ? (
           <p className="mt-4 text-sm text-[var(--muted)]">
-            Nicio comandă în interval.
+            {t("analytics.noOrders")}
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
@@ -177,11 +187,11 @@ export default async function AnalyticsPage({
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="panel p-5">
           <h2 className="text-lg font-semibold tracking-tight">
-            Evaluări pe tip
+            {t("analytics.evalsByType")}
           </h2>
           {data.evaluationsByType.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              Nicio evaluare în interval.
+              {t("analytics.noEvals")}
             </p>
           ) : (
             <ul className="mt-4 flex flex-col gap-2">
@@ -202,11 +212,11 @@ export default async function AnalyticsPage({
 
         <section className="panel p-5">
           <h2 className="text-lg font-semibold tracking-tight">
-            Reguli potrivite
+            {t("analytics.matchedRules")}
           </h2>
           {data.topRules.length === 0 ? (
             <p className="mt-4 text-sm text-[var(--muted)]">
-              Nicio regulă potrivită în interval.
+              {t("analytics.noRules")}
             </p>
           ) : (
             <ul className="mt-4 flex flex-col gap-2">

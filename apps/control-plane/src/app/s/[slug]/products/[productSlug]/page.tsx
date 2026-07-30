@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DecisionPanel } from "@/components/decision-panel";
 import { StorefrontChrome } from "@/components/storefront-chrome";
+import { getTranslator } from "@/i18n/server";
 
 export default async function ProductPage({
   params,
@@ -18,6 +19,7 @@ export default async function ProductPage({
 }) {
   // route will be products/[productSlug]
   const p = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(p.slug);
   if (!store) notFound();
 
@@ -115,18 +117,22 @@ export default async function ProductPage({
         </p>
         {typeof loyalty.decision.loyaltyPoints === "number" && (
           <p className="mt-1 text-sm text-[var(--accent)]">
-            Poți acumula ~{loyalty.decision.loyaltyPoints} puncte loialitate
+            {t("orders.loyaltyPoints", {
+              points: loyalty.decision.loyaltyPoints,
+            })}
           </p>
         )}
         <form action={addAction} className="mt-6">
           <Button type="submit" disabled={!available} size="lg">
-            {available ? "Adaugă în coș" : "Indisponibil"}
+            {available
+              ? t("storefront.addToCart")
+              : t("storefront.unavailable")}
           </Button>
         </form>
       </div>
       <div className="flex flex-col gap-4">
         <DecisionPanel
-          title="Preț"
+          title={t("storefront.price")}
           matchedRules={pricing.matchedRules}
           rulesetVersion={pricing.rulesetVersion}
           explanation={pricing.explanation}
@@ -136,7 +142,7 @@ export default async function ProductPage({
           traceId={pricing.traceId}
         />
         <DecisionPanel
-          title="Disponibilitate"
+          title={t("storefront.availability")}
           matchedRules={availability.matchedRules}
           rulesetVersion={availability.rulesetVersion}
           explanation={availability.explanation}

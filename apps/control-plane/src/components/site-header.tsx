@@ -2,12 +2,15 @@ import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Button } from "./ui/button";
+import { PreferencesControls } from "./preferences-controls";
+import { getTranslator } from "@/i18n/server";
 
 export async function SiteHeader({
   store,
 }: {
   store?: { slug: string; name: string; id: string } | null;
 }) {
+  const t = await getTranslator();
   const session = await auth();
   let isStaff = false;
   if (store && session?.user?.id) {
@@ -30,7 +33,7 @@ export async function SiteHeader({
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5">
         <div className="flex items-center gap-6">
           <Link href="/" className="text-[15px] font-semibold tracking-tight">
-            RuleShop
+            {t("common.appName")}
           </Link>
           {store && (
             <nav className="flex flex-wrap items-center gap-3 text-sm text-[var(--muted)]">
@@ -41,13 +44,13 @@ export async function SiteHeader({
                 href={`/s/${store.slug}/cart`}
                 className="hover:text-[var(--fg)]"
               >
-                Coș
+                {t("nav.cart")}
               </Link>
               <Link
                 href={`/s/${store.slug}/orders`}
                 className="hover:text-[var(--fg)]"
               >
-                Comenzi
+                {t("nav.orders")}
               </Link>
               {isStaff && (
                 <>
@@ -55,13 +58,13 @@ export async function SiteHeader({
                     href={`/s/${store.slug}/admin`}
                     className="font-medium text-[var(--accent)]"
                   >
-                    Dashboard
+                    {t("common.dashboard")}
                   </Link>
                   <Link
                     href={`/s/${store.slug}/rules`}
                     className="hover:text-[var(--fg)]"
                   >
-                    Reguli
+                    {t("nav.rules")}
                   </Link>
                 </>
               )}
@@ -69,9 +72,10 @@ export async function SiteHeader({
           )}
         </div>
         <div className="flex items-center gap-2 text-sm">
+          <PreferencesControls />
           <Link href="/docs">
             <Button variant="ghost" size="sm">
-              Docs
+              {t("common.docs")}
             </Button>
           </Link>
           {session?.user ? (
@@ -82,7 +86,7 @@ export async function SiteHeader({
               {session.user.platformRole === "PLATFORM_ADMIN" && (
                 <Link href="/platform">
                   <Button variant="outline" size="sm">
-                    Platformă
+                    {t("common.platform")}
                   </Button>
                 </Link>
               )}
@@ -93,14 +97,14 @@ export async function SiteHeader({
                 }}
               >
                 <Button type="submit" variant="ghost" size="sm">
-                  Ieșire
+                  {t("common.signOut")}
                 </Button>
               </form>
             </>
           ) : (
             <Link href={`/login${store ? `?next=/s/${store.slug}` : ""}`}>
               <Button variant="outline" size="sm">
-                Autentificare
+                {t("common.signIn")}
               </Button>
             </Link>
           )}

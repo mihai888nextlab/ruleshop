@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { getTranslator } from "@/i18n/server";
 import { requireStoreRole } from "@/lib/auth";
 import { runDecision } from "@/lib/decide";
 import { getStoreBySlug } from "@/lib/store";
@@ -18,6 +19,7 @@ export default async function TestHarnessPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
   const authz = await requireStoreRole(store.id, "OPERATOR");
@@ -43,17 +45,14 @@ export default async function TestHarnessPage({
         rulesetVersion: sp.version ? Number(sp.version) : undefined,
       });
     } catch (e) {
-      parseError = e instanceof Error ? e.message : "Eroare";
+      parseError = e instanceof Error ? e.message : t("test.error");
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-semibold tracking-tight text-3xl">Test harness</h1>
-      <p className="text-sm text-[var(--muted)]">
-        Evaluează o versiune de reguli pe un context JSON fără a afecta
-        storefront-ul (subiect test:).
-      </p>
+      <h1 className="font-semibold tracking-tight text-3xl">{t("test.title")}</h1>
+      <p className="text-sm text-[var(--muted)]">{t("test.intro")}</p>
       <TestHarnessForm
         slug={slug}
         defaultType={sp.type ?? "pricing"}
@@ -74,7 +73,7 @@ export default async function TestHarnessPage({
       {parseError && <p className="text-red-700">{parseError}</p>}
       {result && (
         <DecisionPanel
-          title="Rezultat test"
+          title={t("test.result")}
           matchedRules={result.matchedRules}
           rulesetVersion={result.rulesetVersion}
           explanation={result.explanation}

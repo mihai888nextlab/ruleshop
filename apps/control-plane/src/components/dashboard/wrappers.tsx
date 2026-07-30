@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/lib/auth";
 import { DashboardShell } from "@/components/dashboard/shell";
+import { getTranslator } from "@/i18n/server";
 
 export async function StoreDashboard({
   store,
@@ -10,6 +11,7 @@ export async function StoreDashboard({
   children: React.ReactNode;
 }) {
   const session = await auth();
+  const t = await getTranslator();
 
   return (
     <DashboardShell
@@ -28,7 +30,7 @@ export async function StoreDashboard({
                   href="/platform"
                   className="text-xs text-[var(--sidebar-muted)] hover:text-[var(--sidebar-fg)]"
                 >
-                  Platformă →
+                  {t("nav.platformArrow")}
                 </Link>
               )}
               <form
@@ -41,14 +43,17 @@ export async function StoreDashboard({
                   type="submit"
                   className="text-xs text-[var(--sidebar-muted)] hover:text-[var(--sidebar-fg)]"
                 >
-                  Ieșire
+                  {t("common.signOut")}
                 </button>
               </form>
             </div>
           </div>
         ) : (
-          <Link href={`/login?next=/s/${store.slug}/admin`} className="dash-nav-link">
-            Autentificare
+          <Link
+            href={`/login?next=/s/${store.slug}/admin`}
+            className="dash-nav-link"
+          >
+            {t("common.signIn")}
           </Link>
         )
       }
@@ -64,11 +69,12 @@ export async function PlatformDashboard({
   children: React.ReactNode;
 }) {
   const session = await auth();
+  const t = await getTranslator();
 
   return (
     <DashboardShell
-      title="Platformă"
-      subtitle="Toate magazinele"
+      title={t("common.platform")}
+      subtitle={t("nav.allStores")}
       footer={
         session?.user ? (
           <div className="px-2 pt-2">
@@ -86,13 +92,13 @@ export async function PlatformDashboard({
                 type="submit"
                 className="text-xs text-[var(--sidebar-muted)] hover:text-[var(--sidebar-fg)]"
               >
-                Ieșire
+                {t("common.signOut")}
               </button>
             </form>
           </div>
         ) : (
           <Link href="/login?next=/platform" className="dash-nav-link">
-            Autentificare
+            {t("common.signIn")}
           </Link>
         )
       }

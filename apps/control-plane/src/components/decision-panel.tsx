@@ -1,3 +1,6 @@
+"use client";
+
+import { useT } from "@/components/i18n-provider";
 import { Badge } from "./ui/badge";
 
 type DecisionPanelProps = {
@@ -13,7 +16,7 @@ type DecisionPanelProps = {
 };
 
 export function DecisionPanel({
-  title = "Decizie rule engine",
+  title,
   matchedRules = [],
   rulesetVersion,
   explanation = [],
@@ -23,26 +26,31 @@ export function DecisionPanel({
   traceId,
   compact,
 }: DecisionPanelProps) {
+  const t = useT();
+  const panelTitle = title ?? t("decision.title");
+
   return (
     <aside
       className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-3 text-sm"
-      aria-label={title}
+      aria-label={panelTitle}
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <p className="font-medium text-[var(--fg)]">{title}</p>
+        <p className="font-medium text-[var(--fg)]">{panelTitle}</p>
         {rulesetVersion != null && (
-          <Badge tone="muted">versiune {rulesetVersion}</Badge>
+          <Badge tone="muted">
+            {t("decision.versionBadge", { n: rulesetVersion })}
+          </Badge>
         )}
-        {isCanary && <Badge tone="warn">canary</Badge>}
+        {isCanary && <Badge tone="warn">{t("evaluations.canary")}</Badge>}
         {traceId && <Badge tone="muted">{traceId}</Badge>}
       </div>
       {matchedRules.length > 0 ? (
         <p className="mb-2 text-[var(--muted)]">
-          Reguli:{" "}
+          {t("decision.rules")}{" "}
           <span className="text-[var(--fg)]">{matchedRules.join(", ")}</span>
         </p>
       ) : (
-        <p className="mb-2 text-[var(--muted)]">Nicio regulă potrivită</p>
+        <p className="mb-2 text-[var(--muted)]">{t("decision.noneMatched")}</p>
       )}
       {decision && !compact && (
         <pre className="mb-2 overflow-x-auto rounded bg-[var(--surface-2)] p-2 text-xs">

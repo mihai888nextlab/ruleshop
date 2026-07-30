@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
+import { useT } from "@/components/i18n-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatRon } from "@/lib/utils";
@@ -27,6 +28,7 @@ export function OrderList({
     status: "PENDING" | "PAID" | "SHIPPED" | "CANCELLED" | "BLOCKED",
   ) => Promise<void>;
 }) {
+  const t = useT();
   const list = useListQuery({
     items: orders,
     searchText: (o) => `${o.id} ${o.status}`,
@@ -52,21 +54,21 @@ export function OrderList({
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută comandă…"
+        searchPlaceholder={t("orders.search")}
         filters={[
           {
             key: "status",
-            label: "Status",
+            label: t("orders.status"),
             options: statuses.map((s) => ({ value: s, label: s })),
           },
         ]}
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "dateDesc", label: "Dată ↓" },
-          { value: "dateAsc", label: "Dată ↑" },
-          { value: "totalDesc", label: "Total ↓" },
-          { value: "totalAsc", label: "Total ↑" },
+          { value: "dateDesc", label: t("orders.sortDateDesc") },
+          { value: "dateAsc", label: t("orders.sortDateAsc") },
+          { value: "totalDesc", label: t("orders.sortTotalDesc") },
+          { value: "totalAsc", label: t("orders.sortTotalAsc") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -76,7 +78,7 @@ export function OrderList({
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          Niciun rezultat
+          {t("common.noResults")}
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -92,7 +94,8 @@ export function OrderList({
                   </Link>
                   <p className="text-sm text-[var(--muted)]">
                     {new Date(o.createdAt).toLocaleString("ro-RO")} ·{" "}
-                    {formatRon(o.total)} · {o.itemCount} produse
+                    {formatRon(o.total)} · {o.itemCount}{" "}
+                    {t("orders.productsCount")}
                   </p>
                 </div>
                 <Badge
