@@ -10,6 +10,7 @@ import {
   type FieldType,
   isGroupCondition,
   isNotCondition,
+  summariseCondition,
 } from "@ruleshop/engine";
 
 /**
@@ -365,29 +366,17 @@ export function classifyErrors(errors: string[]): ClassifiedErrors {
   return { byPath, actionErrors, generalErrors };
 }
 
-/** Human summary of a subtree, for collapsed blocks and drag overlays. */
+/**
+ * Human summary of a subtree, for collapsed blocks and drag overlays.
+ *
+ * Delegates to the engine so rule lists, version diffs and AI explanations all
+ * describe the same rule with the same words.
+ */
 export function describeCondition(
   cond: Condition,
   schema: ContextSchema,
 ): string {
-  if (isGroupCondition(cond)) {
-    const word = cond.op === "and" ? "ȘI" : "SAU";
-    return `grup ${word} (${cond.children.length})`;
-  }
-  if (isNotCondition(cond)) {
-    return `NU (${describeCondition(cond.child, schema)})`;
-  }
-
-  const field = schema.fields.find((f) => f.path === cond.path);
-  const label = field?.label ?? cond.path;
-  const op = field ? operatorLabel(field.type, cond.op) : cond.op;
-  if (cond.op === "exists") return `${label} ${op}`;
-  return `${label} ${op} ${formatValue(cond.value)}`;
+  return summariseCondition(cond, schema);
 }
 
-export function formatValue(value: unknown): string {
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "boolean") return value ? "da" : "nu";
-  if (value === undefined || value === null) return "—";
-  return String(value);
-}
+export { formatConditionValue as formatValue } from "@ruleshop/engine";

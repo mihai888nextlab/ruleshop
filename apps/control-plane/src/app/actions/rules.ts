@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import type { DecisionType, RulesetStatus } from "@prisma/client";
 import { validateRule, validateRuleset } from "@ruleshop/engine";
 import type { Action, Condition, RuleDefinition } from "@ruleshop/engine";
@@ -8,7 +9,11 @@ import { requireStoreRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
 import { loadContextSchema, loadEditorSchema } from "@/lib/context-schema";
 import { prisma } from "@/lib/prisma";
-import { getStoreBySlug } from "@/lib/store";
+import {
+  getStoreBySlug,
+  parseNumberArray,
+  parseStringArray,
+} from "@/lib/store";
 
 async function ctx(slug: string, min: "OPERATOR" | "STORE_ADMIN" = "OPERATOR") {
   const store = await getStoreBySlug(slug);
@@ -274,6 +279,86 @@ export async function setCanaryPercent(slug: string, percent: number) {
     meta: { percent: p },
   });
   revalidatePath(`/s/${slug}/rules`);
+}
+
+/**
+ * Takes a single rule out of service without editing any version.
+ *
+ * A rule's own `enabled` flag lives inside a ruleset, so flipping it means
+ * producing and publishing a new version — too slow when a rule is actively
+ * causing harm, and it rewrites the record of what was live. This is the
+ * operational override instead: immediate, reversible, and audited.
+ */
+export async function setRuleKilled(
+  slug: string,
+  ruleKey: unknown,
+  killed: unknown,
+) {
+  const { store, authz } = await ctx(slug, "STORE_ADMIN");
+
+  const key = z.string().trim().min(1).max(120).safeParse(ruleKey);
+  if (!key.success) throw new Error("Cheie de regulă invalidă");
+  if (typeof killed !== "boolean") throw new Error("Valoare invalidă");
+
+  const current = new Set(parseStringArray(store.killedRuleKeys));
+  if (killed) current.add(key.data);
+  else current.delete(key.data);
+
+  await prisma.store.update({
+    where: { id: store.id },
+    data: { killedRuleKeys: [...current] },
+  });
+
+  await writeAudit({
+    storeId: store.id,
+    userId: authz.session.user.id,
+    action: killed ? "killswitch.rule_killed" : "killswitch.rule_restored",
+    entity: "Rule",
+    entityId: key.data,
+    meta: { ruleKey: key.data },
+  });
+
+  revalidatePath(`/s/${slug}/rules`);
+  revalidatePath(`/s/${slug}`);
+}
+
+/**
+ * Refuses a ruleset version at resolution time.
+ *
+ * Killing the stable version leaves decisions with no rules at all, which is the
+ * intended blast radius: stop serving it now, rather than silently falling back
+ * to a version nobody chose. Killing a canary falls back to stable.
+ */
+export async function setVersionKilled(
+  slug: string,
+  version: unknown,
+  killed: unknown,
+) {
+  const { store, authz } = await ctx(slug, "STORE_ADMIN");
+
+  const parsed = z.number().int().positive().safeParse(version);
+  if (!parsed.success) throw new Error("Versiune invalidă");
+  if (typeof killed !== "boolean") throw new Error("Valoare invalidă");
+
+  const current = new Set(parseNumberArray(store.killedVersions));
+  if (killed) current.add(parsed.data);
+  else current.delete(parsed.data);
+
+  await prisma.store.update({
+    where: { id: store.id },
+    data: { killedVersions: [...current] },
+  });
+
+  await writeAudit({
+    storeId: store.id,
+    userId: authz.session.user.id,
+    action: killed ? "killswitch.version_killed" : "killswitch.version_restored",
+    entity: "Ruleset",
+    meta: { version: parsed.data },
+  });
+
+  revalidatePath(`/s/${slug}/rules`);
+  revalidatePath(`/s/${slug}`);
 }
 
 export async function setKillSwitch(

@@ -101,17 +101,41 @@ describe("storefront / control-plane boundary", () => {
     ).toEqual([]);
   });
 
-  it("reaches the control plane only through the shared api module", () => {
-    // Any other file calling fetch() against the control plane would bypass
-    // the schema validation and identity headers in lib/api.ts.
+  it("fetches data only through the shared api module", () => {
+    // This is the property that matters. A fetch anywhere else would bypass the
+    // response-schema validation and identity headers in lib/api.ts, and could
+    // reach the control plane with an unvalidated shape or no bearer token.
     const offenders = files
       .filter((file) => !file.endsWith(join("lib", "api.ts")))
-      .filter((file) => /CONTROL_PLANE_URL/.test(readFileSync(file, "utf8")))
+      .filter((file) => /\bfetch\s*\(/.test(readFileSync(file, "utf8")))
       .map((f) => f.replace(appRoot, "apps/storefront"));
 
     expect(
       offenders,
-      `CONTROL_PLANE_URL should only be read by lib/api.ts, found in: ${offenders.join(", ")}`,
+      `fetch() should only appear in lib/api.ts, found in: ${offenders.join(", ")}`,
+    ).toEqual([]);
+  });
+
+  it("reads the control plane origin only where it is justified", () => {
+    /**
+     * lib/api.ts needs it to call the API. lib/product-image.ts needs it to build
+     * an <img src> for admin uploads, which the control plane serves from its own
+     * origin — that is asset addressing, not data access, so it does not weaken
+     * the boundary. Anything else reading it is far more likely to be an attempt
+     * to talk to the API directly.
+     */
+    const allowed = [join("lib", "api.ts"), join("lib", "product-image.ts")];
+
+    const offenders = files
+      .filter((file) => !allowed.some((suffix) => file.endsWith(suffix)))
+      .filter((file) =>
+        /CONTROL_PLANE_URL/.test(readFileSync(file, "utf8")),
+      )
+      .map((f) => f.replace(appRoot, "apps/storefront"));
+
+    expect(
+      offenders,
+      `unexpected CONTROL_PLANE_URL reader: ${offenders.join(", ")}`,
     ).toEqual([]);
   });
 });

@@ -43,6 +43,7 @@ export function evaluate(input: EvaluationInput): EvaluationResult {
   }
 
   const killed = new Set(input.killedCategories ?? []);
+  const killedRules = new Set(input.killedRuleKeys ?? []);
 
   const rules = [...input.rules]
     .filter((r) => r.enabled)
@@ -59,6 +60,19 @@ export function evaluate(input: EvaluationInput): EvaluationResult {
         ruleName: rule.name,
         matched: false,
         reason: `Categorie ${rule.category} dezactivată (kill switch)`,
+      });
+      continue;
+    }
+
+    // A killed rule is skipped but still reported, so the trace explains the
+    // absence of an effect an operator might otherwise go looking for.
+    if (killedRules.has(rule.key)) {
+      warnings.push(`Regula "${rule.key}" este dezactivată prin kill switch`);
+      explanation.push({
+        ruleKey: rule.key,
+        ruleName: rule.name,
+        matched: false,
+        reason: "Regulă dezactivată individual (kill switch)",
       });
       continue;
     }

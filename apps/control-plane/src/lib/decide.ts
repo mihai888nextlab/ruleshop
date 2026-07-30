@@ -7,7 +7,11 @@ import type {
 } from "@ruleshop/engine";
 import { isInCanary } from "./canary";
 import { prisma } from "./prisma";
-import { parseKillCategories } from "./store";
+import {
+  parseKillCategories,
+  parseNumberArray,
+  parseStringArray,
+} from "./store";
 
 /**
  * Decision service: resolves which ruleset a subject should see, runs the
@@ -33,14 +37,27 @@ export async function resolveRulesetForSubject(
   if (!store) return null;
 
   const dep = store.deployment;
-  let version = dep?.stableVersion ?? null;
+  const killedVersions = new Set(parseNumberArray(store.killedVersions));
+
+  /**
+   * A killed stable version resolves to no ruleset at all, which means every
+   * decision falls back to its default. That is the intended blast radius of
+   * killing a version: stop serving it immediately, rather than silently serving
+   * some older version nobody chose.
+   */
+  let version =
+    dep?.stableVersion != null && !killedVersions.has(dep.stableVersion)
+      ? dep.stableVersion
+      : null;
   let isCanary = false;
 
   // Deterministic: the same subject always lands in the same cohort for a given
   // store and percentage, so a customer never flips ruleset between page loads.
+  // A killed canary falls back to stable, which is the point of canarying.
   if (
     dep?.canaryVersion != null &&
     dep.canaryPercent > 0 &&
+    !killedVersions.has(dep.canaryVersion) &&
     isInCanary(storeId, subjectKey, dep.canaryPercent)
   ) {
     version = dep.canaryVersion;
@@ -128,6 +145,7 @@ export function evaluateAgainst(
     context,
     rules: resolved.ruleset ? toRuleDefs(resolved.ruleset.rules) : [],
     killedCategories: killed,
+    killedRuleKeys: parseStringArray(resolved.store.killedRuleKeys),
     killAll: resolved.store.killSwitchEnabled,
   });
 

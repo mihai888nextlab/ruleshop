@@ -75,8 +75,18 @@ export interface EvaluationInput {
   decisionType: DecisionType;
   context: Record<string, unknown>;
   rules: RuleDefinition[];
-  /** Categories killed for this store */
+  /** Decision categories disabled for this store. */
   killedCategories?: DecisionType[];
+  /**
+   * Individual rule keys disabled for this store.
+   *
+   * Distinct from a rule's own `enabled` flag: that lives inside a ruleset
+   * version and editing it means producing a new version. This is an operational
+   * override that takes a single misbehaving rule out of service immediately,
+   * without touching the published version or its audit trail.
+   */
+  killedRuleKeys?: string[];
+  /** Store-wide switch disabling all rule evaluation. */
   killAll?: boolean;
 }
 

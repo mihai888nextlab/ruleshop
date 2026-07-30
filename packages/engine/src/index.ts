@@ -5,3 +5,5 @@ export * from "./conditions";
 export * from "./actions";
 export * from "./path";
 export * from "./schema";
+export * from "./describe";
+export * from "./diff";

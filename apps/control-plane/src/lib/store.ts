@@ -25,3 +25,16 @@ export function parseKillCategories(raw: unknown): string[] {
     .filter(([, v]) => v === true)
     .map(([k]) => k);
 }
+
+/** Reads a JSON string array column defensively. */
+export function parseStringArray(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string");
+}
+
+export function parseNumberArray(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (v): v is number => typeof v === "number" && Number.isInteger(v),
+  );
+}

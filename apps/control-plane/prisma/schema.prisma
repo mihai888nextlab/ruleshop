@@ -61,9 +61,19 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  /// Kill switches: category -> true means disabled
-  killSwitchCategories Json @default("{}")
+  /// Kill switches. These are operational overrides, deliberately stored on the
+  /// store rather than inside a ruleset: a published version stays immutable so
+  /// it remains auditable and restorable, so "turn this off now" must not
+  /// require editing it.
+  ///
+  /// Category map: decision type -> true means disabled.
+  killSwitchCategories Json    @default("{}")
+  /// Store-wide switch stopping all rule evaluation.
   killSwitchEnabled    Boolean @default(false)
+  /// Individual rule keys taken out of service.
+  killedRuleKeys       Json    @default("[]")
+  /// Ruleset versions refused at resolution time.
+  killedVersions       Json    @default("[]")
 
   memberships   Membership[]
   products      Product[]
