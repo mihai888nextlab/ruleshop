@@ -19,6 +19,7 @@ import {
 import { AiConsole } from "@/components/ai/ai-console";
 import type { FraudTriageView } from "@/components/ai/fraud-panel";
 import type { SuggestionView } from "@/components/ai/suggestion-card";
+import { getTranslator } from "@/i18n/server";
 import { requireStoreRole } from "@/lib/auth";
 import { isAiConfigured } from "@/lib/ai";
 import type { TrustAssessment } from "@/lib/ai-trust";
@@ -40,6 +41,7 @@ export default async function AiPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
 
@@ -166,15 +168,11 @@ export default async function AiPage({
     <div className="flex flex-col gap-6">
       <div>
         <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
-          ← Control plane
+          {t("common.backControlPlane")}
         </Link>
-        <h1 className="font-semibold tracking-tight text-3xl">Asistent AI</h1>
+        <h1 className="font-semibold tracking-tight text-3xl">{t("ai.title")}</h1>
         <p className="mt-2 max-w-3xl text-sm text-[var(--muted)]">
-          Constatările și cifrele de pe această pagină sunt calculate de
-          aplicație prin reluarea evaluărilor reale. Modelul este folosit doar
-          pentru a le explica și pentru a propune reguli structurate, care sunt
-          validate înainte de a fi arătate. Nicio regulă propusă nu ajunge la
-          clienți fără o publicare separată, făcută de un om.
+          {t("ai.pageIntro")}
         </p>
       </div>
 

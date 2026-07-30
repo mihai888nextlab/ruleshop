@@ -2,7 +2,8 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { useRuleShop } from "@/sdk/RuleShopProvider";
 
 export function StoreShell() {
-  const { store, authenticated, itemCount, signOut } = useRuleShop();
+  const { store, authenticated, itemCount, loyaltyPoints, signOut } =
+    useRuleShop();
   const storeName = store?.storeName ?? "Magazin";
 
   return (
@@ -37,6 +38,12 @@ export function StoreShell() {
                 </NavLink>
                 <NavLink to="/profile" className="text-sm">
                   Profil
+                  {loyaltyPoints !== null && (
+                    <span className="ml-1 text-[var(--muted)]">
+                      <span className="sr-only">, </span>
+                      {loyaltyPoints} p
+                    </span>
+                  )}
                 </NavLink>
                 <button
                   type="button"

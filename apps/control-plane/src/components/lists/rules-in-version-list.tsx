@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/i18n-provider";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { RuleEditorPanel } from "@/components/rule-builder/rule-editor-panel";
 import { describeCondition } from "@/components/rule-builder/schema-utils";
@@ -39,6 +40,7 @@ export function RulesInVersionList({
   onSave: (draft: unknown) => Promise<void>;
   onDelete: (ruleKey: string) => Promise<void>;
 }) {
+  const t = useT();
   const schema = buildContextSchema(customFields);
   const categories = [...new Set(rules.map((r) => r.category))].sort();
 
@@ -69,28 +71,31 @@ export function RulesInVersionList({
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută regulă…"
+        searchPlaceholder={t("rules.searchRule")}
         filters={[
           {
             key: "category",
-            label: "Categorie",
-            options: categories.map((c) => ({ value: c, label: c })),
+            label: t("rules.category"),
+            options: categories.map((c) => ({
+              value: c,
+              label: t(`rules.categories.${c}`),
+            })),
           },
           {
             key: "enabled",
-            label: "Stare",
+            label: t("rules.status"),
             options: [
-              { value: "on", label: "Activă" },
-              { value: "off", label: "Dezactivată" },
+              { value: "on", label: t("rules.ruleActive") },
+              { value: "off", label: t("rules.ruleDisabled") },
             ],
           },
         ]}
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "priority", label: "Prioritate" },
-          { value: "name", label: "Nume" },
-          { value: "category", label: "Categorie" },
+          { value: "priority", label: t("rules.sortPriority") },
+          { value: "name", label: t("rules.sortName") },
+          { value: "category", label: t("rules.category") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -100,7 +105,7 @@ export function RulesInVersionList({
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          Niciun rezultat
+          {t("common.noResults")}
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -115,15 +120,18 @@ export function RulesInVersionList({
                     </span>
                   </p>
                   <p className="text-sm text-[var(--muted)]">
-                    {rule.category} · prioritate {rule.priority} ·{" "}
-                    {rule.enabled ? "activă" : "dezactivată"}
+                    {t(`rules.categories.${rule.category}`)} ·{" "}
+                    {t("rules.priorityMeta", { priority: rule.priority })} ·{" "}
+                    {rule.enabled
+                      ? t("rules.activeShort")
+                      : t("rules.disabledShort")}
                   </p>
                   <p className="mt-1 text-sm">
-                    <span className="text-[var(--muted)]">dacă </span>
+                    <span className="text-[var(--muted)]">{t("rules.if")} </span>
                     {describeCondition(rule.conditions, schema)}
                   </p>
                   <p className="text-sm">
-                    <span className="text-[var(--muted)]">atunci </span>
+                    <span className="text-[var(--muted)]">{t("rules.then")} </span>
                     {rule.actions.map((a) => a.type).join(", ")}
                   </p>
                 </div>
@@ -135,7 +143,7 @@ export function RulesInVersionList({
                     }}
                   >
                     <Button type="submit" variant="danger" size="sm">
-                      Șterge
+                      {t("common.delete")}
                     </Button>
                   </form>
                 )}
@@ -157,7 +165,7 @@ export function RulesInVersionList({
                       actions: rule.actions,
                     }}
                     onSave={onSave}
-                    openLabel="Editează în editorul vizual"
+                    openLabel={t("rules.editVisual")}
                   />
                 </div>
               )}

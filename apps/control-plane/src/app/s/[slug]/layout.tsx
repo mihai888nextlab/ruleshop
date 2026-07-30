@@ -46,7 +46,10 @@ export default async function StoreLayout({
         : "nord";
 
   return (
-    <div className="min-h-screen" data-theme={themeId}>
+    <div
+      className="min-h-screen bg-[var(--bg)] text-[var(--fg)]"
+      data-theme={themeId}
+    >
       {children}
     </div>
   );

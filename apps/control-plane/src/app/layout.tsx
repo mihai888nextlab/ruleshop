@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/session-provider";
+import { ThemeProvider } from "@/components/theme-provider";
+import { I18nProvider } from "@/components/i18n-provider";
+import { getLocale } from "@/i18n/server";
 
 const sans = IBM_Plex_Sans({
   variable: "--font-body",
@@ -12,18 +15,29 @@ const sans = IBM_Plex_Sans({
 
 export const metadata: Metadata = {
   title: "RuleShop Control Plane",
-  description: "Administrare reguli, magazine și decizii",
+  description: "Rule, store, and decision administration",
 };
 
-export default function RootLayout({
+const themeInitScript = `(function(){try{var t=localStorage.getItem('ruleshop_theme');if(t)t=t.replace(/"/g,'');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var dark=t==='dark'||((!t||t==='system')&&d);document.documentElement.classList.toggle('dark',!!dark);}catch(e){}})();`;
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+
   return (
-    <html lang="ro" className={`${sans.variable} h-full`}>
+    <html lang={locale} className={`${sans.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className="min-h-full antialiased">
-        <SessionProvider>{children}</SessionProvider>
+        <ThemeProvider>
+          <I18nProvider locale={locale}>
+            <SessionProvider>{children}</SessionProvider>
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

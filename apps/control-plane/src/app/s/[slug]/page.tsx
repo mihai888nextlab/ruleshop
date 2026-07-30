@@ -9,6 +9,7 @@ import { formatRon } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { DecisionPanel } from "@/components/decision-panel";
 import { StorefrontChrome } from "@/components/storefront-chrome";
+import { getTranslator } from "@/i18n/server";
 
 export default async function CatalogPage({
   params,
@@ -18,6 +19,7 @@ export default async function CatalogPage({
   searchParams: Promise<{ q?: string; category?: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const sp = await searchParams;
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
@@ -114,8 +116,7 @@ export default async function CatalogPage({
           {store.name}
         </h1>
         <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-          Prețurile și disponibilitatea sunt calculate de rule engine în timp
-          real.
+          {t("storefront.catalogIntro")}
         </p>
       </section>
 
@@ -123,7 +124,7 @@ export default async function CatalogPage({
         <input
           name="q"
           defaultValue={sp.q}
-          placeholder="Caută produse…"
+          placeholder={t("storefront.searchProducts")}
           className="min-w-[200px] flex-1 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
         />
         <select
@@ -131,7 +132,7 @@ export default async function CatalogPage({
           defaultValue={sp.category ?? ""}
           className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
         >
-          <option value="">Toate categoriile</option>
+          <option value="">{t("storefront.allCategories")}</option>
           {categories.map((c) => (
             <option key={c.category} value={c.category}>
               {c.category}
@@ -142,7 +143,7 @@ export default async function CatalogPage({
           type="submit"
           className="rounded-[var(--radius)] bg-[var(--accent)] px-4 py-2 text-sm text-[var(--accent-fg)]"
         >
-          Filtrează
+          {t("storefront.filter")}
         </button>
       </form>
 
@@ -156,7 +157,9 @@ export default async function CatalogPage({
             >
               <div className="flex items-start justify-between gap-2">
                 <h2 className="font-semibold tracking-tight text-xl">{p.name}</h2>
-                {!available && <Badge tone="warn">Indisponibil</Badge>}
+                {!available && (
+                  <Badge tone="warn">{t("storefront.unavailable")}</Badge>
+                )}
               </div>
               <p className="line-clamp-2 text-sm text-[var(--muted)]">
                 {p.description}
@@ -176,7 +179,7 @@ export default async function CatalogPage({
               </div>
               {pricing.matchedRules.length > 0 && (
                 <p className="text-xs text-[var(--muted)]">
-                  Reguli: {pricing.matchedRules.join(", ")}
+                  {t("storefront.rules")} {pricing.matchedRules.join(", ")}
                 </p>
               )}
             </Link>
@@ -186,7 +189,7 @@ export default async function CatalogPage({
 
       {priced[0] && (
         <DecisionPanel
-          title="Exemplu decizie preț (primul produs)"
+          title={t("storefront.priceExample")}
           matchedRules={priced[0].pricing.matchedRules}
           rulesetVersion={priced[0].pricing.rulesetVersion}
           explanation={priced[0].pricing.explanation}

@@ -2,11 +2,12 @@
 
 import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
+import { useT } from "@/components/i18n-provider";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
 /**
- * Centered tall/narrow dialog for create flows.
+ * Centered dialog for create flows — wide enough for a 2-column form.
  * Escape, backdrop click, and the close button dismiss it.
  */
 export function Modal({
@@ -22,6 +23,7 @@ export function Modal({
   children: React.ReactNode;
   className?: string;
 }) {
+  const t = useT();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -53,7 +55,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center sm:p-6">
       <button
         type="button"
-        aria-label="Închide"
+        aria-label={t("common.close")}
         className="fixed inset-0 bg-[color-mix(in_oklab,var(--fg)_35%,transparent)]"
         onClick={onClose}
       />
@@ -63,7 +65,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         className={cn(
-          "relative z-10 my-4 flex max-h-[min(90vh,720px)] w-full max-w-md flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-lg squircle",
+          "relative z-10 my-4 flex max-h-[min(90vh,640px)] w-full max-w-xl flex-col overflow-hidden rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] shadow-lg squircle",
           className,
         )}
       >
@@ -78,7 +80,7 @@ export function Modal({
             type="button"
             variant="ghost"
             size="sm"
-            aria-label="Închide"
+            aria-label={t("common.close")}
             onClick={onClose}
           >
             <X size={16} />
@@ -94,16 +96,18 @@ export function Modal({
 
 export function AddButton({
   onClick,
-  label = "Adaugă",
+  label,
 }: {
   onClick: () => void;
   label?: string;
 }) {
+  const t = useT();
+  const ariaLabel = label ?? t("common.add");
   return (
     <Button
       type="button"
       variant="outline"
-      aria-label={label}
+      aria-label={ariaLabel}
       onClick={onClick}
       className="h-10 w-10 shrink-0 px-0 text-xl font-medium leading-none"
     >

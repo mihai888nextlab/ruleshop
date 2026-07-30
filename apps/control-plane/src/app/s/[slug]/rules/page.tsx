@@ -13,6 +13,7 @@ import { RulesetList } from "@/components/lists/ruleset-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getTranslator } from "@/i18n/server";
 import { requireStoreRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import {
@@ -21,12 +22,22 @@ import {
   parseStringArray,
 } from "@/lib/store";
 
+const KILL_CATEGORIES = [
+  "pricing",
+  "shipping",
+  "fraud",
+  "availability",
+  "loyalty",
+  "theme",
+] as const;
+
 export default async function RulesHomePage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
   const authz = await requireStoreRole(store.id, "OPERATOR");
@@ -58,7 +69,7 @@ export default async function RulesHomePage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Reguli"
+        title={t("rules.title")}
         actions={
           <form
             action={async () => {
@@ -69,14 +80,16 @@ export default async function RulesHomePage({
               redirect(`/s/${slug}/rules/${r.version}`);
             }}
           >
-            <Button type="submit">Draft nou</Button>
+            <Button type="submit">{t("rules.newDraft")}</Button>
           </form>
         }
       />
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="panel p-5">
-          <h2 className="text-xl font-semibold tracking-tight">Canary</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {t("rules.canary")}
+          </h2>
           <form
             className="mt-4 flex gap-2"
             action={async (fd) => {
@@ -98,7 +111,9 @@ export default async function RulesHomePage({
         </div>
 
         <div className="panel p-5">
-          <h2 className="text-xl font-semibold tracking-tight">Kill switch</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            {t("rules.killSwitch")}
+          </h2>
           <form
             className="mt-4"
             action={async () => {
@@ -114,21 +129,12 @@ export default async function RulesHomePage({
               size="sm"
             >
               {store.killSwitchEnabled
-                ? "Dezactivează kill global"
-                : "Activează kill global"}
+                ? t("rules.disableGlobalKill")
+                : t("rules.enableGlobalKill")}
             </Button>
           </form>
           <div className="mt-3 flex flex-wrap gap-2">
-            {(
-              [
-                "pricing",
-                "shipping",
-                "fraud",
-                "availability",
-                "loyalty",
-                "theme",
-              ] as const
-            ).map((cat) => (
+            {KILL_CATEGORIES.map((cat) => (
               <form
                 key={cat}
                 action={async () => {
@@ -143,8 +149,8 @@ export default async function RulesHomePage({
                   size="sm"
                   variant={killCats[cat] ? "danger" : "ghost"}
                 >
-                  {cat}
-                  {killCats[cat] ? " OFF" : ""}
+                  {t(`rules.categories.${cat}`)}
+                  {killCats[cat] ? t("rules.categoryOff") : ""}
                 </Button>
               </form>
             ))}
@@ -155,7 +161,9 @@ export default async function RulesHomePage({
       {liveRules.length > 0 && (
         <section>
           <h2 className="mb-3 text-xl font-semibold tracking-tight">
-            Reguli active în v{dep?.stableVersion}
+            {t("rules.activeInVersion", {
+              version: dep?.stableVersion ?? "",
+            })}
           </h2>
           <ul className="flex flex-col gap-2">
             {liveRules.map((rule) => {
@@ -171,11 +179,15 @@ export default async function RulesHomePage({
                       <span className="text-xs text-[var(--muted)]">
                         {rule.key}
                       </span>
-                      <Badge tone="muted">{rule.category}</Badge>
-                      <Badge tone="muted">prio {rule.priority}</Badge>
-                      {killed && <Badge tone="warn">oprită</Badge>}
+                      <Badge tone="muted">
+                        {t(`rules.categories.${rule.category}`)}
+                      </Badge>
+                      <Badge tone="muted">
+                        {t("rules.prio", { n: rule.priority })}
+                      </Badge>
+                      {killed && <Badge tone="warn">{t("rules.killed")}</Badge>}
                       {!rule.enabled && (
-                        <Badge tone="muted">dezactivată în versiune</Badge>
+                        <Badge tone="muted">{t("rules.disabledInVersion")}</Badge>
                       )}
                     </p>
                   </div>
@@ -190,7 +202,7 @@ export default async function RulesHomePage({
                       size="sm"
                       variant={killed ? "danger" : "ghost"}
                     >
-                      {killed ? "Reactivează" : "Kill"}
+                      {killed ? t("rules.reactivate") : t("rules.kill")}
                     </Button>
                   </form>
                 </li>
@@ -201,7 +213,9 @@ export default async function RulesHomePage({
       )}
 
       <section>
-        <h2 className="mb-3 text-xl font-semibold tracking-tight">Versiuni</h2>
+        <h2 className="mb-3 text-xl font-semibold tracking-tight">
+          {t("rules.versions")}
+        </h2>
         <RulesetList
           slug={slug}
           stableVersion={dep?.stableVersion ?? null}

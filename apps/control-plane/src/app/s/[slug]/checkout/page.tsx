@@ -11,6 +11,7 @@ import { placeOrder } from "@/app/actions/checkout";
 import { DecisionPanel } from "@/components/decision-panel";
 import { CheckoutForm } from "@/components/checkout-form";
 import { StorefrontChrome } from "@/components/storefront-chrome";
+import { getTranslator } from "@/i18n/server";
 
 export default async function CheckoutPage({
   params,
@@ -18,6 +19,7 @@ export default async function CheckoutPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
 
@@ -25,9 +27,9 @@ export default async function CheckoutPage({
   if (cart.items.length === 0) {
     return (
       <p>
-        Coș gol.{" "}
+        {t("storefront.cartEmpty")}{" "}
         <Link href={`/s/${slug}`} className="underline">
-          Înapoi la catalog
+          {t("storefront.continueShopping")}
         </Link>
       </p>
     );
@@ -121,7 +123,9 @@ export default async function CheckoutPage({
     <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="grid gap-8 lg:grid-cols-2">
       <div className="flex flex-col gap-4">
-        <h1 className="font-semibold tracking-tight text-3xl">Checkout</h1>
+        <h1 className="font-semibold tracking-tight text-3xl">
+          {t("storefront.checkout")}
+        </h1>
         <p className="text-sm text-[var(--muted)]">
           Subtotal estimat: {formatRon(pricedSubtotal)} (față de baza{" "}
           {formatRon(cartSubtotal(cart.items))})
@@ -133,20 +137,22 @@ export default async function CheckoutPage({
           placeOrder={placeOrder}
         />
         {fraudPreview.decision.blocked === true && (
-          <p className="rounded-[var(--radius)] bg-red-50 p-3 text-sm text-red-800">
+          <p className="rounded-[var(--radius)] border border-[var(--danger-border)] bg-[var(--danger-soft)] p-3 text-sm text-[var(--danger)]">
             Atenție: antifraudă ar bloca această comandă —{" "}
             {String(fraudPreview.decision.blockReason)}
           </p>
         )}
         {typeof loyalty.decision.loyaltyPoints === "number" && (
           <p className="text-sm text-[var(--accent)]">
-            Vei primi {loyalty.decision.loyaltyPoints} puncte loialitate
+            {t("orders.loyaltyPoints", {
+              points: loyalty.decision.loyaltyPoints,
+            })}
           </p>
         )}
       </div>
       <div className="flex flex-col gap-4">
         <DecisionPanel
-          title="Livrare"
+          title={t("storefront.shipping")}
           matchedRules={shipping.matchedRules}
           rulesetVersion={shipping.rulesetVersion}
           explanation={shipping.explanation}
@@ -155,7 +161,7 @@ export default async function CheckoutPage({
           traceId={shipping.traceId}
         />
         <DecisionPanel
-          title="Antifraudă (previzualizare)"
+          title={t("storefront.fraudPreview")}
           matchedRules={fraudPreview.matchedRules}
           explanation={fraudPreview.explanation}
           decision={fraudPreview.decision}

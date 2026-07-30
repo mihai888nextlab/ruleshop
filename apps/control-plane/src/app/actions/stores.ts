@@ -13,9 +13,12 @@ import {
 } from "@/lib/store-api-key";
 import {
   buildCloneCommand,
+  buildDegitCommand,
   degitSource,
   publicApiUrl,
+  storefrontImage,
 } from "@/lib/storefront-clone";
+import { getTranslator } from "@/i18n/server";
 
 const slugSchema = z
   .string()
@@ -36,7 +39,8 @@ const createStoreSchema = z.object({
 async function requirePlatformAdmin() {
   const session = await auth();
   if (!session?.user || session.user.platformRole !== "PLATFORM_ADMIN") {
-    throw new Error("Neautorizat");
+    const t = await getTranslator();
+    throw new Error(t("errors.unauthorized"));
   }
   return session;
 }
@@ -57,11 +61,12 @@ export async function createStoreAction(
 ): Promise<CreateStoreResult> {
   await requirePlatformAdmin();
 
+  const t = await getTranslator();
   const parsed = createStoreSchema.safeParse(input);
   if (!parsed.success) {
     return {
       ok: false,
-      error: "Date invalide — verifică magazinul și contul de admin",
+      error: t("errors.invalidStoreAdmin"),
     };
   }
 
@@ -95,6 +100,7 @@ export async function createStoreAction(
 export async function openStoreAction(
   input: unknown,
 ): Promise<CreateStoreResult> {
+  const t = await getTranslator();
   const limited = rateLimit("open-store:global", {
     limit: 10,
     windowMs: 60_000,
@@ -102,7 +108,7 @@ export async function openStoreAction(
   if (!limited.ok) {
     return {
       ok: false,
-      error: "Prea multe cereri. Încearcă din nou peste un minut.",
+      error: t("errors.rateLimitedMinute"),
     };
   }
 
@@ -110,7 +116,7 @@ export async function openStoreAction(
   if (!parsed.success) {
     return {
       ok: false,
-      error: "Date invalide — verifică magazinul și contul de admin",
+      error: t("errors.invalidStoreAdmin"),
     };
   }
 
@@ -141,14 +147,21 @@ export async function openStoreAction(
 }
 
 export async function rotateStoreKeyAction(slug: string): Promise<
-  | { ok: true; apiKey: string; cloneCommand: string; prefix: string }
+  | {
+      ok: true;
+      apiKey: string;
+      cloneCommand: string;
+      degitCommand: string;
+      prefix: string;
+    }
   | { ok: false; error: string }
 > {
+  const t = await getTranslator();
   const session = await auth();
-  if (!session?.user) return { ok: false, error: "Neautorizat" };
+  if (!session?.user) return { ok: false, error: t("errors.unauthorized") };
 
   const store = await prisma.store.findUnique({ where: { slug } });
-  if (!store) return { ok: false, error: "Magazin inexistent" };
+  if (!store) return { ok: false, error: t("errors.storeNotFound") };
 
   const isPlatform = session.user.platformRole === "PLATFORM_ADMIN";
   if (!isPlatform) {
@@ -158,7 +171,7 @@ export async function rotateStoreKeyAction(slug: string): Promise<
       },
     });
     if (!membership || membership.role !== "STORE_ADMIN") {
-      return { ok: false, error: "Neautorizat" };
+      return { ok: false, error: t("errors.unauthorized") };
     }
   }
 
@@ -178,6 +191,7 @@ export async function rotateStoreKeyAction(slug: string): Promise<
     apiKey: key.plaintext,
     prefix: key.prefix,
     cloneCommand: buildCloneCommand(key.plaintext),
+    degitCommand: buildDegitCommand(key.plaintext),
   };
 }
 
@@ -206,5 +220,6 @@ export async function getStoreConnectionInfo(slug: string) {
     keys,
     apiUrl: publicApiUrl(),
     degitSource: degitSource(),
+    storefrontImage: storefrontImage(),
   };
 }

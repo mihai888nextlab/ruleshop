@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { decisionMetaSchema, storeContextSchema } from "./catalog";
 import { shippingOptionSchema } from "./decision";
+import { customerTierSchema } from "./profile";
 
 /**
  * Cart and checkout contracts.
@@ -63,6 +64,16 @@ export const cartResponseSchema = z.object({
   viewer: z.object({
     authenticated: z.boolean(),
     email: z.string().nullable(),
+    /**
+     * Loyalty standing exactly as the engine saw it while pricing this cart.
+     *
+     * Sent here rather than left to the auth response because that one is only
+     * accurate at sign-in: checkout grants points, and a balance in the header
+     * has to move when they land. Every cart read refreshes it for free — the
+     * pricing pass already loaded these facts to evaluate the rules.
+     */
+    loyaltyPoints: z.number().int(),
+    tier: customerTierSchema,
   }),
 });
 

@@ -112,13 +112,28 @@ export type CartLine = {
   pricingDecision: DecisionMeta;
 };
 
+export type LoyaltyPreview = { points: number; decision: DecisionMeta };
+
 export type CartResponse = {
   store: StoreContext;
   lines: CartLine[];
   subtotal: number;
+  /** Sum of per-line savings versus catalogue prices. */
+  discountTotal: number;
   shippingOptions: ShippingOption[];
+  shippingDecision: DecisionMeta;
+  /** Points the published rules would grant for this cart. */
+  loyalty: LoyaltyPreview;
+  fraudDecision: DecisionMeta;
+  /** Set when a fraud rule would block checkout, so the UI can warn early. */
+  blockedReason: string | null;
   merged: boolean;
-  viewer: { authenticated: boolean; email?: string | null };
+  viewer: {
+    authenticated: boolean;
+    email?: string | null;
+    loyaltyPoints: number;
+    tier: CustomerTier;
+  };
 };
 
 export type CheckoutResponse = {
@@ -174,7 +189,15 @@ export type ProfileField = {
   value: unknown;
 };
 
-export type ProfileResponse = { fields: ProfileField[] };
+export type CustomerTier = "guest" | "standard" | "vip";
+
+export type LoyaltyBalance = {
+  points: number;
+  tier: CustomerTier;
+  vipThreshold: number;
+};
+
+export type ProfileResponse = { fields: ProfileField[]; loyalty: LoyaltyBalance };
 
 export type ProfileUpdateResponse = {
   ok: boolean;

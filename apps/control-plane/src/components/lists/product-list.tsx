@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { ProductAdminForm } from "@/components/product-admin-form";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ export function ProductList({
   products: ProductListItem[];
   upsertProduct: (slug: string, formData: FormData) => Promise<void>;
 }) {
+  const t = useT();
   const [creating, setCreating] = useState(false);
   const categories = [...new Set(products.map((p) => p.category))].sort();
 
@@ -56,7 +58,7 @@ export function ProductList({
   return (
     <div className="flex flex-col gap-3">
       <h2 className="flex items-baseline gap-2 text-lg font-semibold tracking-tight">
-        Catalog
+        {t("products.catalog")}
         <span className="text-sm font-normal tabular-nums text-[var(--muted)]">
           {list.resultCount === list.totalCount
             ? list.totalCount
@@ -67,29 +69,29 @@ export function ProductList({
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută produs…"
+        searchPlaceholder={t("products.search")}
         filters={[
           {
             key: "active",
-            label: "Stare",
+            label: t("products.status"),
             options: [
-              { value: "active", label: "Activ" },
-              { value: "inactive", label: "Inactiv" },
+              { value: "active", label: t("common.active") },
+              { value: "inactive", label: t("common.inactive") },
             ],
           },
           {
             key: "category",
-            label: "Categorie",
+            label: t("products.category"),
             options: categories.map((c) => ({ value: c, label: c })),
           },
         ]}
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "name", label: "Nume" },
-          { value: "priceAsc", label: "Preț ↑" },
-          { value: "priceDesc", label: "Preț ↓" },
-          { value: "stock", label: "Stoc" },
+          { value: "name", label: t("products.sortName") },
+          { value: "priceAsc", label: t("products.sortPriceAsc") },
+          { value: "priceDesc", label: t("products.sortPriceDesc") },
+          { value: "stock", label: t("products.sortStock") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -97,13 +99,13 @@ export function ProductList({
         totalCount={list.totalCount}
         showCount={false}
         actions={
-          <AddButton label="Adaugă produs" onClick={() => setCreating(true)} />
+          <AddButton label={t("products.add")} onClick={() => setCreating(true)} />
         }
       />
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          {products.length === 0 ? "Niciun produs încă." : "Niciun rezultat"}
+          {products.length === 0 ? t("products.empty") : t("common.noResults")}
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
@@ -124,11 +126,13 @@ export function ProductList({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{p.name}</p>
-                    {!p.active && <Badge tone="danger">inactiv</Badge>}
+                    {!p.active && (
+                      <Badge tone="danger">{t("products.inactiveBadge")}</Badge>
+                    )}
                   </div>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    /{p.slug} · {p.category} · stoc {p.stock} ·{" "}
-                    {formatRon(p.basePrice)}
+                    /{p.slug} · {p.category} · {t("products.stock")} {p.stock}{" "}
+                    · {formatRon(p.basePrice)}
                   </p>
                 </div>
               </div>
@@ -155,7 +159,7 @@ export function ProductList({
       <Modal
         open={creating}
         onClose={() => setCreating(false)}
-        title="Produs nou"
+        title={t("products.newTitle")}
       >
         <ProductAdminForm
           slug={slug}

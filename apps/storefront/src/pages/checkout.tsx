@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CheckoutForm } from "@/components/checkout-form";
 import { money } from "@/components/decision-note";
+import { LoyaltyEarnNote } from "@/components/loyalty";
 import { useRuleShop } from "@/sdk/RuleShopProvider";
 
 export function CheckoutPage() {
@@ -31,9 +32,21 @@ export function CheckoutPage() {
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col gap-8 px-5 py-10">
       <h1 className="display text-4xl">Checkout</h1>
-      <p className="text-sm text-[var(--muted)]">
-        Subtotal {money(cart.subtotal)} · {cart.lines.length} linii
-      </p>
+      <div>
+        <p className="text-sm text-[var(--muted)]">
+          Subtotal {money(cart.subtotal)} · {cart.lines.length} linii
+        </p>
+        <LoyaltyEarnNote
+          earned={cart.loyalty.points}
+          decision={cart.loyalty.decision}
+          className="mt-2"
+        />
+        {!cart.viewer.authenticated && cart.loyalty.points > 0 && (
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Punctele se acordă doar comenzilor plasate dintr-un cont.
+          </p>
+        )}
+      </div>
       <CheckoutForm
         shippingOptions={cart.shippingOptions}
         requiresEmail={!cart.viewer.authenticated}

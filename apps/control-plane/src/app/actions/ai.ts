@@ -29,6 +29,7 @@ import { computeFraudStats } from "@/lib/fraud-analysis";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 import { createDraftRuleset, saveRuleInDraft } from "./rules";
+import { getTranslator } from "@/i18n/server";
 
 /**
  * AI module actions.
@@ -51,11 +52,12 @@ const HISTORY_LIMIT = 500;
 const IMPACT_LIMIT = 300;
 
 async function adminContext(slug: unknown) {
+  const t = await getTranslator();
   const parsed = z.string().trim().min(1).max(80).safeParse(slug);
-  if (!parsed.success) throw new Error("Magazin invalid");
+  if (!parsed.success) throw new Error(t("errors.invalidStore"));
 
   const store = await getStoreBySlug(parsed.data);
-  if (!store) throw new Error("Magazin inexistent");
+  if (!store) throw new Error(t("errors.storeNotFound"));
 
   const authz = await requireStoreRole(store.id, "STORE_ADMIN");
   if (!authz.ok) throw new Error(authz.error);

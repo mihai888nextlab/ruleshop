@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -37,10 +38,11 @@ export function ProductAdminForm({
   slug: string;
   upsertProduct: (slug: string, formData: FormData) => Promise<void>;
   initial?: ProductData;
-  /** Modal / plain form — no panel chrome, single column. */
+  /** Modal / plain form — no panel chrome; fields use a 2-column grid. */
   embedded?: boolean;
   onSuccess?: () => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const isEdit = Boolean(initial);
   const [open, setOpen] = useState(!initial);
@@ -69,7 +71,7 @@ export function ProductAdminForm({
         size="sm"
         onClick={() => setOpen(true)}
       >
-        Editează
+        {t("common.edit")}
       </Button>
     );
   }
@@ -114,23 +116,21 @@ export function ProductAdminForm({
           else resetCreate();
           onSuccess?.();
         } catch (e) {
-          setError(e instanceof Error ? e.message : "Eroare");
+          setError(e instanceof Error ? e.message : t("common.error"));
         } finally {
           setPending(false);
         }
       }}
     >
       {!isEdit && !embedded && (
-        <h2 className="text-lg font-semibold tracking-tight">Produs nou</h2>
+        <h2 className="text-lg font-semibold tracking-tight">
+          {t("products.newTitle")}
+        </h2>
       )}
 
-      <div
-        className={
-          embedded ? "flex flex-col gap-3" : "grid gap-3 sm:grid-cols-2"
-        }
-      >
+      <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Nume</span>
+          <span className="font-medium">{t("products.name")}</span>
           <Input
             value={name}
             onChange={(e) => {
@@ -144,7 +144,7 @@ export function ProductAdminForm({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Slug</span>
+          <span className="font-medium">{t("products.slug")}</span>
           <Input
             value={productSlug}
             onChange={(e) => {
@@ -169,7 +169,7 @@ export function ProductAdminForm({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Categorie</span>
+          <span className="font-medium">{t("products.category")}</span>
           <Input
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -179,16 +179,16 @@ export function ProductAdminForm({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Descriere</span>
+          <span className="font-medium">{t("products.description")}</span>
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Opțional"
+            placeholder={t("common.optional")}
           />
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Preț bază</span>
+          <span className="font-medium">{t("products.basePrice")}</span>
           <Input
             type="number"
             step="0.01"
@@ -201,7 +201,7 @@ export function ProductAdminForm({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Stoc</span>
+          <span className="font-medium">{t("products.stock")}</span>
           <Input
             type="number"
             min={0}
@@ -212,14 +212,8 @@ export function ProductAdminForm({
           />
         </label>
 
-        <div
-          className={
-            embedded
-              ? "flex flex-col gap-2 text-sm"
-              : "flex flex-col gap-1 text-sm sm:col-span-2"
-          }
-        >
-          <span className="font-medium">Imagine</span>
+        <div className="col-span-2 flex flex-col gap-2 text-sm">
+          <span className="font-medium">{t("products.image")}</span>
           {(preview || initial?.imageUrl) && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -241,26 +235,32 @@ export function ProductAdminForm({
               setPreview(URL.createObjectURL(file));
             }}
           />
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={active}
-              onChange={(e) => setActive(e.target.checked)}
-            />
-            Activ
-          </label>
-          {initial?.imageUrl && !preview && (
-            <label className="flex items-center gap-2 text-sm">
-              <input name="clearImage" type="checkbox" />
-              Elimină imaginea
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+              />
+              {t("products.active")}
             </label>
-          )}
+            {initial?.imageUrl && !preview && (
+              <label className="flex items-center gap-2 text-sm">
+                <input name="clearImage" type="checkbox" />
+                {t("products.clearImage")}
+              </label>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending} className="self-start">
-          {pending ? "Se salvează…" : isEdit ? "Salvează" : "Adaugă"}
+          {pending
+            ? t("common.saving")
+            : isEdit
+              ? t("common.save")
+              : t("common.add")}
         </Button>
         {isEdit && (
           <Button
@@ -271,7 +271,7 @@ export function ProductAdminForm({
               setOpen(false);
             }}
           >
-            Anulează
+            {t("common.cancel")}
           </Button>
         )}
       </div>

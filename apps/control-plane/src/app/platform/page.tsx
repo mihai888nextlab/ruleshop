@@ -5,10 +5,12 @@ import { PageHeader, StatCard } from "@/components/dashboard/shell";
 import { PlatformDashboard } from "@/components/dashboard/wrappers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getTranslator } from "@/i18n/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function PlatformPage() {
+  const t = await getTranslator();
   const session = await auth();
   if (!session?.user || session.user.platformRole !== "PLATFORM_ADMIN") {
     redirect("/login?next=/platform");
@@ -42,13 +44,13 @@ export default async function PlatformPage() {
 
   return (
     <PlatformDashboard>
-      <PageHeader title="Administrare multi-tenant" />
+      <PageHeader title={t("platform.title")} />
 
       <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Magazine" value={stores.length} />
-        <StatCard label="Produse" value={totals.products} />
-        <StatCard label="Comenzi" value={totals.orders} />
-        <StatCard label="Evaluări" value={totals.evaluations} />
+        <StatCard label={t("platform.stores")} value={stores.length} />
+        <StatCard label={t("platform.products")} value={totals.products} />
+        <StatCard label={t("platform.orders")} value={totals.orders} />
+        <StatCard label={t("platform.evaluations")} value={totals.evaluations} />
       </div>
 
       <div className="mb-8">
@@ -66,35 +68,47 @@ export default async function PlatformPage() {
                 <p className="mt-1 text-sm text-[var(--muted)]">/{s.slug}</p>
               </div>
               <Badge tone="ok">
-                stable v{s.deployment?.stableVersion ?? "—"}
+                {t("platform.stableBadge", {
+                  version: s.deployment?.stableVersion ?? "—",
+                })}
               </Badge>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Badge tone="muted">{s._count.products} produse</Badge>
-              <Badge tone="muted">{s._count.orders} comenzi</Badge>
-              <Badge tone="muted">{s._count.rulesets} versiuni</Badge>
-              <Badge tone="muted">{s._count.evaluations} evaluări</Badge>
+              <Badge tone="muted">
+                {s._count.products} {t("platform.productsCount")}
+              </Badge>
+              <Badge tone="muted">
+                {s._count.orders} {t("platform.ordersCount")}
+              </Badge>
+              <Badge tone="muted">
+                {s._count.rulesets} {t("platform.versionsCount")}
+              </Badge>
+              <Badge tone="muted">
+                {s._count.evaluations} {t("platform.evaluationsCount")}
+              </Badge>
               {s.deployment?.canaryVersion != null && (
                 <Badge tone="warn">
-                  canary v{s.deployment.canaryVersion} ·{" "}
-                  {s.deployment.canaryPercent}%
+                  {t("platform.canaryBadge", {
+                    version: s.deployment.canaryVersion,
+                    percent: s.deployment.canaryPercent,
+                  })}
                 </Badge>
               )}
             </div>
 
             <div className="mt-auto flex flex-wrap gap-2 pt-5">
               <Link href={`/s/${s.slug}/admin`}>
-                <Button size="sm">Dashboard</Button>
+                <Button size="sm">{t("common.dashboard")}</Button>
               </Link>
               <Link href={`/s/${s.slug}/admin/connection`}>
                 <Button size="sm" variant="outline">
-                  Conexiune
+                  {t("nav.connection")}
                 </Button>
               </Link>
               <Link href={`/s/${s.slug}/rules`}>
                 <Button size="sm" variant="outline">
-                  Reguli
+                  {t("nav.rules")}
                 </Button>
               </Link>
             </div>

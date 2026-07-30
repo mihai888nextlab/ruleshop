@@ -8,6 +8,7 @@ import {
 } from "@ruleshop/contracts";
 import type { FieldType } from "@ruleshop/engine";
 import { apiError, resolveApiIdentity } from "@/lib/api-identity";
+import { loyaltyBalance } from "@/lib/customer-facts";
 import {
   coerceProfileInput,
   loadStoreAttributes,
@@ -58,13 +59,19 @@ export async function GET(request: Request) {
       return apiError("Autentificare necesară", 401);
     }
 
-    const [defs, profile] = await Promise.all([
+    const [defs, profile, membership] = await Promise.all([
       loadStoreAttributes(store.id),
       prisma.customerProfile.findUnique({
         where: {
           storeId_userId: { storeId: store.id, userId: identity.userId },
         },
         select: { values: true },
+      }),
+      prisma.membership.findUnique({
+        where: {
+          storeId_userId: { storeId: store.id, userId: identity.userId },
+        },
+        select: { loyaltyPoints: true },
       }),
     ]);
 
@@ -73,9 +80,13 @@ export async function GET(request: Request) {
       .filter((def) => def.showOnProfile)
       .map((def) => toProfileField(def, values));
 
-    return NextResponse.json(profileResponseSchema.parse({ fields }), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      profileResponseSchema.parse({
+        fields,
+        loyalty: loyaltyBalance(membership?.loyaltyPoints ?? 0),
+      }),
+      { headers: { "Cache-Control": "no-store" } },
+    );
   });
 }
 

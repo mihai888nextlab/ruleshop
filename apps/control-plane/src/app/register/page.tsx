@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useState, useTransition, type FormEvent } from "react";
 import { openStoreAction, type CreateStoreResult } from "@/app/actions/stores";
+import { useT } from "@/components/i18n-provider";
+import { PreferencesControls } from "@/components/preferences-controls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Created = Extract<CreateStoreResult, { ok: true }>;
 
 export default function RegisterPage() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [created, setCreated] = useState<Created | null>(null);
@@ -40,22 +43,22 @@ export default function RegisterPage() {
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-4">
         <div className="w-full max-w-lg border border-[var(--border)] bg-[var(--surface)] p-6">
           <h1 className="text-2xl font-semibold tracking-tight">
-            Magazin gata: {created.store.name}
+            {t("register.ready", { name: created.store.name })}
           </h1>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Cont admin{" "}
-            <code className="text-xs">{created.admin.email}</code>. Copiază
-            cheia API acum — nu o vom mai afișa.
+            {t("register.adminAccountLabel")}{" "}
+            <code className="text-xs">{created.admin.email}</code>.{" "}
+            {t("register.apiKeyWarning")}
           </p>
           <label className="mt-5 flex flex-col gap-1 text-sm">
-            Cheie API
+            {t("register.apiKey")}
             <code className="break-all rounded bg-[var(--surface-2)] px-3 py-2 text-xs">
               {created.apiKey}
             </code>
           </label>
           <label className="mt-3 flex flex-col gap-1 text-sm">
-            Clone storefront
-            <pre className="overflow-x-auto rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
+            {t("register.dockerCommand")}
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
               {created.cloneCommand}
             </pre>
           </label>
@@ -65,11 +68,21 @@ export default function RegisterPage() {
               size="sm"
               onClick={() => void navigator.clipboard.writeText(created.apiKey)}
             >
-              Copiază cheia
+              {t("register.copyKey")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                void navigator.clipboard.writeText(created.cloneCommand)
+              }
+            >
+              {t("register.copyDocker")}
             </Button>
             <Link href={`/login?next=/s/${created.store.slug}/admin`}>
-              <Button size="sm" variant="outline">
-                Autentifică-te în dashboard
+              <Button size="sm" variant="ghost">
+                {t("register.signInDashboard")}
               </Button>
             </Link>
           </div>
@@ -84,16 +97,16 @@ export default function RegisterPage() {
         onSubmit={onSubmit}
         className="w-full max-w-sm border border-[var(--border)] bg-[var(--surface)] p-6"
       >
+        <div className="mb-4 flex justify-end">
+          <PreferencesControls />
+        </div>
         <h1 className="text-2xl font-semibold tracking-tight">
-          Deschide un magazin
+          {t("register.title")}
         </h1>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Creezi un magazin din șablon, un cont de administrator și o cheie API
-          unică pentru storefront.
-        </p>
+        <p className="mt-2 text-sm text-[var(--muted)]">{t("register.intro")}</p>
 
         <label className="mt-5 flex flex-col gap-1 text-sm">
-          Nume magazin
+          {t("register.storeName")}
           <Input
             name="storeName"
             value={storeName}
@@ -108,7 +121,7 @@ export default function RegisterPage() {
           />
         </label>
         <label className="mt-3 flex flex-col gap-1 text-sm">
-          Slug
+          {t("register.slug")}
           <Input
             name="slug"
             value={slug}
@@ -118,27 +131,27 @@ export default function RegisterPage() {
           />
         </label>
 
-        <p className="mt-5 text-sm font-medium">Cont administrator</p>
+        <p className="mt-5 text-sm font-medium">{t("register.adminAccount")}</p>
         <label className="mt-2 flex flex-col gap-1 text-sm">
-          Nume
+          {t("auth.name")}
           <Input name="name" required />
         </label>
         <label className="mt-3 flex flex-col gap-1 text-sm">
-          Email
+          {t("auth.email")}
           <Input name="email" type="email" required />
         </label>
         <label className="mt-3 flex flex-col gap-1 text-sm">
-          Parolă
+          {t("auth.password")}
           <Input name="password" type="password" minLength={8} required />
         </label>
         {error && <p className="mt-3 text-sm text-[var(--danger)]">{error}</p>}
         <Button type="submit" disabled={pending} className="mt-5 w-full">
-          {pending ? "Se creează…" : "Creează magazin"}
+          {pending ? t("register.creating") : t("register.submit")}
         </Button>
         <p className="mt-4 text-sm text-[var(--muted)]">
-          Ai deja cont?{" "}
+          {t("register.haveAccount")}{" "}
           <Link href="/login" className="underline">
-            Autentificare
+            {t("common.signIn")}
           </Link>
         </p>
       </form>

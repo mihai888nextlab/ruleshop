@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/i18n-provider";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { Badge } from "@/components/ui/badge";
 
@@ -12,6 +13,7 @@ export type BuiltinFieldItem = {
 };
 
 export function BuiltinFieldsList({ fields }: { fields: BuiltinFieldItem[] }) {
+  const t = useT();
   const types = [...new Set(fields.map((f) => f.type))].sort();
 
   const list = useListQuery({
@@ -37,20 +39,20 @@ export function BuiltinFieldsList({ fields }: { fields: BuiltinFieldItem[] }) {
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută câmp…"
+        searchPlaceholder={t("attributes.searchField")}
         filters={[
           {
             key: "type",
-            label: "Tip",
-            options: types.map((t) => ({ value: t, label: t })),
+            label: t("attributes.type"),
+            options: types.map((type) => ({ value: type, label: type })),
           },
         ]}
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "label", label: "Etichetă" },
-          { value: "type", label: "Tip" },
-          { value: "path", label: "Path" },
+          { value: "label", label: t("attributes.sortLabel") },
+          { value: "type", label: t("attributes.type") },
+          { value: "path", label: t("attributes.path") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -60,7 +62,7 @@ export function BuiltinFieldsList({ fields }: { fields: BuiltinFieldItem[] }) {
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          Niciun rezultat
+          {t("common.noResults")}
         </p>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
@@ -74,11 +76,11 @@ export function BuiltinFieldsList({ fields }: { fields: BuiltinFieldItem[] }) {
                 {field.path}
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                Operatori: {field.operators.join(", ")}
+                {t("attributes.operators")} {field.operators.join(", ")}
               </p>
               {field.availableIn && (
                 <p className="mt-1 text-xs text-[var(--muted)]">
-                  Doar pentru: {field.availableIn.join(", ")}
+                  {t("attributes.onlyFor")} {field.availableIn.join(", ")}
                 </p>
               )}
             </li>

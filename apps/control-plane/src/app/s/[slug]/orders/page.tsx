@@ -6,6 +6,7 @@ import { getStoreBySlug } from "@/lib/store";
 import { formatRon } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { StorefrontChrome } from "@/components/storefront-chrome";
+import { getTranslator } from "@/i18n/server";
 
 export default async function OrdersPage({
   params,
@@ -13,6 +14,7 @@ export default async function OrdersPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
   const session = await auth();
@@ -20,7 +22,9 @@ export default async function OrdersPage({
   if (!session?.user) {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="font-semibold tracking-tight text-3xl">Comenzile mele</h1>
+        <h1 className="font-semibold tracking-tight text-3xl">
+          {t("orders.myOrders")}
+        </h1>
         <p className="text-sm text-[var(--muted)]">
           <Link href={`/login?next=/s/${slug}/orders`} className="underline">
             Autentifică-te
@@ -39,9 +43,11 @@ export default async function OrdersPage({
   return (
     <StorefrontChrome store={{ id: store.id, slug: store.slug, name: store.name }}>
     <div className="flex flex-col gap-4">
-      <h1 className="font-semibold tracking-tight text-3xl">Comenzile mele</h1>
+      <h1 className="font-semibold tracking-tight text-3xl">
+        {t("orders.myOrders")}
+      </h1>
       {orders.length === 0 ? (
-        <p className="text-[var(--muted)]">Nicio comandă.</p>
+        <p className="text-[var(--muted)]">{t("orders.noneMine")}</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {orders.map((o) => (

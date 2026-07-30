@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { money } from "@/components/decision-note";
+import { points } from "@/components/loyalty";
 import { getOrders } from "@/lib/api";
 import type { OrderSummary } from "@/lib/types";
 import { useRuleShop } from "@/sdk/RuleShopProvider";
@@ -59,6 +60,11 @@ export function OrdersPage() {
               >
                 <span className="font-medium">{order.id.slice(0, 8)}…</span>
                 <span className="text-sm text-[var(--muted)]">{order.status}</span>
+                {order.loyaltyPointsEarned > 0 && (
+                  <span className="text-sm text-[var(--positive)]">
+                    +{points(order.loyaltyPointsEarned)}
+                  </span>
+                )}
                 <span className="text-sm font-medium">{money(order.total)}</span>
               </Link>
             </li>

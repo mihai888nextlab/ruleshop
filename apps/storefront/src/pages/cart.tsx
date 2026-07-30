@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { money } from "@/components/decision-note";
+import { LoyaltyEarnNote } from "@/components/loyalty";
 import { emptyCart, setCartItem } from "@/lib/api";
 import { useRuleShop } from "@/sdk/RuleShopProvider";
 
@@ -77,9 +78,16 @@ export function CartPage() {
           </ul>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-lg font-medium">
-              Subtotal {money(cart.subtotal)}
-            </p>
+            <div>
+              <p className="text-lg font-medium">
+                Subtotal {money(cart.subtotal)}
+              </p>
+              <LoyaltyEarnNote
+                earned={cart.loyalty.points}
+                decision={cart.loyalty.decision}
+                className="mt-1"
+              />
+            </div>
             <div className="flex gap-3">
               <button type="button" onClick={() => void clear()} className="btn btn-ghost">
                 Golește

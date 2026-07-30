@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { findRulesReferencingAttribute } from "@/lib/context-schema";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
+import { getTranslator } from "@/i18n/server";
 
 /**
  * Administration of customer attribute definitions.
@@ -48,11 +49,12 @@ const slugSchema = z.string().trim().min(1).max(80);
 const idSchema = z.string().trim().min(1).max(60);
 
 async function adminContext(slug: unknown) {
+  const t = await getTranslator();
   const parsedSlug = slugSchema.safeParse(slug);
-  if (!parsedSlug.success) throw new Error("Magazin invalid");
+  if (!parsedSlug.success) throw new Error(t("errors.invalidStore"));
 
   const store = await getStoreBySlug(parsedSlug.data);
-  if (!store) throw new Error("Magazin inexistent");
+  if (!store) throw new Error(t("errors.storeNotFound"));
 
   const authz = await requireStoreRole(store.id, "STORE_ADMIN");
   if (!authz.ok) throw new Error(authz.error);

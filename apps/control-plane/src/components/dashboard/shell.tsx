@@ -17,6 +17,8 @@ import {
   Tags,
   Workflow,
 } from "lucide-react";
+import { PreferencesControls } from "@/components/preferences-controls";
+import { useT } from "@/components/i18n-provider";
 import { cn } from "@/lib/utils";
 
 export type DashNavItem = {
@@ -24,7 +26,6 @@ export type DashNavItem = {
   label: string;
   icon?: React.ReactNode;
   exact?: boolean;
-  /** Custom active matcher when path prefixes would collide (e.g. /rules vs /rules/test). */
   match?: (pathname: string) => boolean;
 };
 
@@ -64,47 +65,50 @@ function NavList({ items }: { items: DashNavItem[] }) {
   );
 }
 
-function storeSections(storeSlug: string): NavSection[] {
+function storeSections(
+  storeSlug: string,
+  t: (key: string) => string,
+): NavSection[] {
   return [
     {
       id: "magazin",
-      label: "Magazin",
+      label: t("nav.store"),
       items: [
         {
           href: `/s/${storeSlug}/admin`,
-          label: "Overview",
+          label: t("nav.overview"),
           icon: <LayoutDashboard size={15} />,
           exact: true,
         },
         {
           href: `/s/${storeSlug}/admin/products`,
-          label: "Produse",
+          label: t("nav.products"),
           icon: <Boxes size={15} />,
         },
         {
           href: `/s/${storeSlug}/admin/orders`,
-          label: "Comenzi",
+          label: t("nav.orders"),
           icon: <ClipboardList size={15} />,
         },
         {
           href: `/s/${storeSlug}/admin/analytics`,
-          label: "Analitică",
+          label: t("nav.analytics"),
           icon: <BarChart3 size={15} />,
         },
         {
           href: `/s/${storeSlug}/admin/connection`,
-          label: "Conexiune",
+          label: t("nav.connection"),
           icon: <Store size={15} />,
         },
       ],
     },
     {
       id: "decizii",
-      label: "Decizii",
+      label: t("nav.decisions"),
       items: [
         {
           href: `/s/${storeSlug}/rules`,
-          label: "Reguli",
+          label: t("nav.rules"),
           icon: <Workflow size={15} />,
           match: (pathname) =>
             pathname === `/s/${storeSlug}/rules` ||
@@ -112,64 +116,49 @@ function storeSections(storeSlug: string): NavSection[] {
         },
         {
           href: `/s/${storeSlug}/attributes`,
-          label: "Schema",
+          label: t("nav.schema"),
           icon: <Tags size={15} />,
         },
         {
           href: `/s/${storeSlug}/themes`,
-          label: "Teme",
+          label: t("nav.themes"),
           icon: <Palette size={15} />,
         },
         {
           href: `/s/${storeSlug}/rules/evaluations`,
-          label: "Evaluări",
+          label: t("nav.evaluations"),
           icon: <ScrollText size={15} />,
         },
       ],
     },
     {
       id: "laborator",
-      label: "Laborator",
+      label: t("nav.lab"),
       items: [
         {
           href: `/s/${storeSlug}/rules/test`,
-          label: "Test harness",
+          label: t("nav.testHarness"),
           icon: <FlaskConical size={15} />,
         },
         {
           href: `/s/${storeSlug}/rules/diff`,
-          label: "Diff",
+          label: t("nav.diff"),
           icon: <GitCompare size={15} />,
         },
         {
           href: `/s/${storeSlug}/rules/ai`,
-          label: "AI",
+          label: t("nav.ai"),
           icon: <Sparkles size={15} />,
         },
         {
           href: `/s/${storeSlug}/rules/audit`,
-          label: "Audit",
+          label: t("nav.audit"),
           icon: <Shield size={15} />,
         },
       ],
     },
   ];
 }
-
-const platformSections: NavSection[] = [
-  {
-    id: "platform",
-    label: "Platformă",
-    items: [
-      {
-        href: "/platform",
-        label: "Magazine",
-        icon: <LayoutDashboard size={15} />,
-        exact: true,
-      },
-    ],
-  },
-];
 
 export function DashboardShell({
   title,
@@ -184,13 +173,25 @@ export function DashboardShell({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const t = useT();
   const pathname = usePathname();
-  const sections = storeSlug ? storeSections(storeSlug) : platformSections;
+  const platformSections: NavSection[] = [
+    {
+      id: "platform",
+      label: t("nav.platform"),
+      items: [
+        {
+          href: "/platform",
+          label: t("nav.stores"),
+          icon: <LayoutDashboard size={15} />,
+          exact: true,
+        },
+      ],
+    },
+  ];
+  const sections = storeSlug ? storeSections(storeSlug, t) : platformSections;
   const mobileItems = storeSlug
-    ? [
-        ...sections[0]!.items,
-        ...sections[1]!.items,
-      ]
+    ? [...sections[0]!.items, ...sections[1]!.items]
     : sections.flatMap((s) => s.items);
 
   return (
@@ -198,10 +199,10 @@ export function DashboardShell({
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-white/10 bg-[var(--sidebar)] px-2.5 py-4 text-[var(--sidebar-fg)] md:flex">
         <div className="px-2 pb-4">
           <Link href="/" className="text-[15px] font-semibold tracking-tight">
-            RuleShop
+            {t("common.appName")}
           </Link>
           <p className="mt-0.5 text-xs text-[var(--sidebar-muted)]">
-            Control plane
+            {t("common.controlPlane")}
           </p>
         </div>
 
@@ -226,13 +227,14 @@ export function DashboardShell({
           ))}
         </div>
 
-        <div className="mt-3 space-y-0.5 border-t border-white/10 px-0.5 pt-3">
+        <div className="mt-3 space-y-2 border-t border-white/10 px-0.5 pt-3">
+          <PreferencesControls compact />
           {storeSlug && (
             <Link href={`/s/${storeSlug}`} className="dash-nav-link">
               <span className="dash-nav-icon">
                 <Store size={15} />
               </span>
-              Magazin live
+              {t("nav.liveStore")}
             </Link>
           )}
           {!storeSlug && (
@@ -240,7 +242,7 @@ export function DashboardShell({
               <span className="dash-nav-icon">
                 <Store size={15} />
               </span>
-              Acasă
+              {t("common.home")}
             </Link>
           )}
           {footer}
@@ -256,9 +258,12 @@ export function DashboardShell({
                 <p className="text-xs text-[var(--muted)]">{subtitle}</p>
               )}
             </div>
-            <Link href="/" className="text-sm text-[var(--muted)]">
-              RuleShop
-            </Link>
+            <div className="flex items-center gap-2">
+              <PreferencesControls />
+              <Link href="/" className="text-sm text-[var(--muted)]">
+                {t("common.appName")}
+              </Link>
+            </div>
           </div>
           <div className="flex gap-1 overflow-x-auto px-3 pb-3">
             {mobileItems.map((item) => {

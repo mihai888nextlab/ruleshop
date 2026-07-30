@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 
@@ -18,6 +19,7 @@ export function CheckoutForm({
     formData: FormData,
   ) => Promise<{ error?: string } | void>;
 }) {
+  const t = useT();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -36,12 +38,14 @@ export function CheckoutForm({
     >
       {isGuest && (
         <label className="flex flex-col gap-1 text-sm">
-          Email (guest)
+          {t("storefront.guestEmail")}
           <Input name="guestEmail" type="email" required />
         </label>
       )}
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1 text-sm font-medium">Livrare</legend>
+        <legend className="mb-1 text-sm font-medium">
+          {t("storefront.shipping")}
+        </legend>
         {shippingOptions.map((o) => (
           <label key={o.method} className="flex items-center gap-2 text-sm">
             <input
@@ -60,7 +64,7 @@ export function CheckoutForm({
       </p>
       {error && <p className="text-sm text-red-700">{error}</p>}
       <Button type="submit" size="lg" disabled={loading}>
-        {loading ? "Se plasează…" : "Plasează comanda"}
+        {loading ? t("storefront.placing") : t("storefront.placeOrder")}
       </Button>
     </form>
   );

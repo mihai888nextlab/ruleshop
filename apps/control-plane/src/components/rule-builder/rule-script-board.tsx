@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/components/i18n-provider";
 import type {
   Action,
   Condition,
@@ -48,6 +49,7 @@ export function RuleScriptBoard({
   actionErrors: string[];
   themeKeys: string[];
 }) {
+  const t = useT();
   const actionMetas = actionsForScope(decisionType);
 
   function addAction(actionType: string) {
@@ -66,10 +68,10 @@ export function RuleScriptBoard({
     >
       <div className="rb-workspace">
         <aside className="rb-palette">
-          <p className="rb-palette-title">Blocuri</p>
+          <p className="rb-palette-title">{t("rules.blocks")}</p>
           <ConditionPalette fields={fieldsInScope} />
           <div className="rb-palette-group">
-            <p className="rb-palette-label">Acțiuni</p>
+            <p className="rb-palette-label">{t("rules.actions")}</p>
             {actionMetas.map((meta) => (
               <ActionBrick
                 key={meta.type}
@@ -81,10 +83,10 @@ export function RuleScriptBoard({
         </aside>
 
         <div className="rb-script-pane">
-          <div className="rb-cblock" role="group" aria-label="Dacă → Atunci">
+          <div className="rb-cblock" role="group" aria-label={`${t("rules.when")} → ${t("rules.thenBlock")}`}>
             <div className="rb-cblock-bar rb-cblock-bar--if">
               <span className="rb-cblock-notch" aria-hidden />
-              <span className="rb-cblock-word">Dacă</span>
+              <span className="rb-cblock-word">{t("rules.when")}</span>
               <RootLogicToggle
                 value={conditions}
                 onChange={onConditionsChange}
@@ -102,11 +104,11 @@ export function RuleScriptBoard({
             </div>
 
             <div className="rb-cblock-bar rb-cblock-bar--then">
-              <span className="rb-cblock-word">Atunci</span>
+              <span className="rb-cblock-word">{t("rules.thenBlock")}</span>
               <span className="rb-cblock-hint">
                 {actions.length === 1
-                  ? "1 acțiune"
-                  : `${actions.length} acțiuni`}
+                  ? t("rules.oneAction")
+                  : t("rules.nActions", { n: actions.length })}
               </span>
             </div>
 

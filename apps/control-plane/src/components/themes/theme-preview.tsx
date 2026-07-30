@@ -6,6 +6,7 @@ import {
   themeToCssVars,
   type ThemeTokens,
 } from "@ruleshop/contracts";
+import { useT } from "@/components/i18n-provider";
 
 /**
  * Miniature of the storefront under a set of tokens.
@@ -26,6 +27,7 @@ export function ThemePreview({
   tokens: ThemeTokens;
   storeName: string;
 }) {
+  const t = useT();
   const vars = themeToCssVars(tokens);
 
   const style = {
@@ -94,7 +96,7 @@ export function ThemePreview({
             {storeName}
           </span>
           <span style={{ color: "var(--muted)", fontSize: "0.7rem" }}>
-            Coș (2)
+            {t("themes.previewCart")}
           </span>
         </header>
 
@@ -108,7 +110,7 @@ export function ThemePreview({
                 letterSpacing: "0.14em",
               }}
             >
-              Colecție
+              {t("themes.previewCollection")}
             </p>
             <h2
               style={{
@@ -120,7 +122,7 @@ export function ThemePreview({
                 marginTop: 4,
               }}
             >
-              Palton din lână
+              {t("themes.previewProduct")}
             </h2>
             <p
               style={{
@@ -129,7 +131,7 @@ export function ThemePreview({
                 marginTop: 6,
               }}
             >
-              Prețul este decis de rule engine pentru fiecare client.
+              {t("storefront.catalogIntro")}
             </p>
           </div>
 
@@ -183,7 +185,7 @@ export function ThemePreview({
                 width: "fit-content",
               }}
             >
-              Adaugă în coș
+              {t("storefront.addToCart")}
             </button>
           </div>
 
@@ -196,12 +198,14 @@ export function ThemePreview({
               gap: 4,
             }}
           >
-            <span style={{ fontSize: "0.75rem" }}>Livrare gratuită</span>
+            <span style={{ fontSize: "0.75rem" }}>
+              {t("themes.freeShipping")}
+            </span>
             <span style={{ color: "var(--warning)", fontSize: "0.7rem" }}>
-              Stoc limitat
+              {t("themes.previewLowStock")}
             </span>
             <span style={{ color: "var(--danger)", fontSize: "0.7rem" }}>
-              Indisponibil în acest oraș
+              {t("themes.previewUnavailable")}
             </span>
           </div>
         </div>

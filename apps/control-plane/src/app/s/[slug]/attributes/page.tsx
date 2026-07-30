@@ -13,6 +13,7 @@ import {
 } from "@/components/attribute-manager";
 import { PageHeader } from "@/components/dashboard/shell";
 import { BuiltinFieldsList } from "@/components/lists/builtin-fields-list";
+import { getTranslator } from "@/i18n/server";
 import { requireStoreRole } from "@/lib/auth";
 import { loadStoreAttributes } from "@/lib/context-schema";
 import { getStoreBySlug } from "@/lib/store";
@@ -28,6 +29,8 @@ export default async function AttributesPage({
 
   const authz = await requireStoreRole(store.id, "STORE_ADMIN");
   if (!authz.ok) redirect(`/login?next=/s/${slug}/attributes`);
+
+  const t = await getTranslator();
 
   const defs = await loadStoreAttributes(store.id, { includeArchived: true });
 
@@ -49,7 +52,7 @@ export default async function AttributesPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Schema clientului" />
+      <PageHeader title={t("attributes.pageTitle")} />
 
       <AttributeManager
         attributes={attributes}
@@ -63,7 +66,7 @@ export default async function AttributesPage({
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">
-          Câmpuri predefinite
+          {t("attributes.builtins")}
         </h2>
         <BuiltinFieldsList
           fields={BUILTIN_FIELDS.map((field) => ({

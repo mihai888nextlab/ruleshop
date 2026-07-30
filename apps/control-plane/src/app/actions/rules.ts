@@ -14,6 +14,7 @@ import {
   parseNumberArray,
   parseStringArray,
 } from "@/lib/store";
+import { getTranslator } from "@/i18n/server";
 
 /**
  * Refuses a rule that selects a theme the store has not defined.
@@ -47,8 +48,9 @@ async function assertThemesExist(storeId: string, actions: Action[]) {
 }
 
 async function ctx(slug: string, min: "OPERATOR" | "STORE_ADMIN" = "OPERATOR") {
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
-  if (!store) throw new Error("Magazin inexistent");
+  if (!store) throw new Error(t("errors.storeNotFound"));
   const authz = await requireStoreRole(store.id, min);
   if (!authz.ok) throw new Error(authz.error);
   return { store, authz };

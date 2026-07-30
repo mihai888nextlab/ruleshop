@@ -1,7 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useT } from "@/components/i18n-provider";
+import type { DecisionType } from "@ruleshop/engine";
 import { Button } from "./ui/button";
+
+const DECISION_TYPES: DecisionType[] = [
+  "pricing",
+  "shipping",
+  "fraud",
+  "availability",
+  "loyalty",
+  "theme",
+];
 
 export function TestHarnessForm({
   slug,
@@ -14,6 +25,7 @@ export function TestHarnessForm({
   defaultVersion: string;
   defaultContext: string;
 }) {
+  const t = useT();
   const router = useRouter();
   return (
     <form
@@ -35,17 +47,15 @@ export function TestHarnessForm({
           defaultValue={defaultType}
           className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
         >
-          {["pricing", "shipping", "fraud", "availability", "loyalty", "theme"].map(
-            (t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ),
-          )}
+          {DECISION_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {t(`rules.categories.${type}`)}
+            </option>
+          ))}
         </select>
         <input
           name="version"
-          placeholder="versiune (gol = live)"
+          placeholder={t("test.versionPlaceholder")}
           defaultValue={defaultVersion}
           className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm"
         />
@@ -55,7 +65,7 @@ export function TestHarnessForm({
         defaultValue={defaultContext}
         className="min-h-48 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-3 font-mono text-xs"
       />
-      <Button type="submit">Evaluează</Button>
+      <Button type="submit">{t("test.evaluate")}</Button>
     </form>
   );
 }

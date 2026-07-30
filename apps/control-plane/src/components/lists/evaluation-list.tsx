@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useT } from "@/components/i18n-provider";
+import type { TranslateFn } from "@/i18n/dictionary";
 import { DataToolbar, useListQuery } from "@/components/data-toolbar";
 import { DecisionPanel } from "@/components/decision-panel";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +36,7 @@ export function EvaluationList({
   slug: string;
   evaluations: EvaluationListItem[];
 }) {
+  const t = useT();
   const [openId, setOpenId] = useState<string | null>(null);
   const types = [...new Set(evaluations.map((e) => e.decisionType))].sort();
 
@@ -64,28 +67,31 @@ export function EvaluationList({
       <DataToolbar
         search={list.search}
         onSearchChange={list.setSearch}
-        searchPlaceholder="Caută evaluare…"
+        searchPlaceholder={t("evaluations.search")}
         filters={[
           {
             key: "type",
-            label: "Tip",
-            options: types.map((t) => ({ value: t, label: t })),
+            label: t("evaluations.type"),
+            options: types.map((type) => ({
+              value: type,
+              label: t(`rules.categories.${type}` as "rules.categories.pricing"),
+            })),
           },
           {
             key: "canary",
-            label: "Canary",
+            label: t("evaluations.canary"),
             options: [
-              { value: "yes", label: "da" },
-              { value: "no", label: "nu" },
+              { value: "yes", label: t("common.yes") },
+              { value: "no", label: t("common.no") },
             ],
           },
         ]}
         filterValues={list.filterValues}
         onFilterChange={list.setFilter}
         sorts={[
-          { value: "dateDesc", label: "Dată ↓" },
-          { value: "dateAsc", label: "Dată ↑" },
-          { value: "type", label: "Tip" },
+          { value: "dateDesc", label: t("evaluations.sortDateDesc") },
+          { value: "dateAsc", label: t("evaluations.sortDateAsc") },
+          { value: "type", label: t("evaluations.type") },
         ]}
         sort={list.sort}
         onSortChange={list.setSort}
@@ -95,7 +101,7 @@ export function EvaluationList({
 
       {list.filtered.length === 0 ? (
         <p className="py-8 text-center text-sm text-[var(--muted)]">
-          Niciun rezultat
+          {t("common.noResults")}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -114,16 +120,19 @@ export function EvaluationList({
                     {e.rulesetVersion != null && (
                       <Badge tone="muted">v{e.rulesetVersion}</Badge>
                     )}
-                    {e.isCanary && <Badge tone="warn">canary</Badge>}
+                    {e.isCanary && (
+                      <Badge tone="warn">{t("evaluations.canary")}</Badge>
+                    )}
                     <span className="text-[var(--muted)]">
-                      {new Date(e.createdAt).toLocaleString("ro-RO")}
+                      {new Date(e.createdAt).toLocaleString()}
                     </span>
                     <span className="ml-auto text-xs text-[var(--muted)]">
-                      {open ? "Ascunde" : "Detalii"}
+                      {open ? t("common.hide") : t("common.details")}
                     </span>
                   </div>
                   <p>
-                    Reguli: {e.matchedRules.join(", ") || "—"}
+                    {t("evaluations.rules")}{" "}
+                    {e.matchedRules.join(", ") || "—"}
                   </p>
                   <p className="font-mono text-xs text-[var(--muted)]">
                     {e.subjectKey ?? e.id}
@@ -133,7 +142,7 @@ export function EvaluationList({
                 {open && (
                   <div className="border-t border-[var(--border)] bg-[var(--surface-2)] p-3">
                     <DecisionPanel
-                      title="Rezultat evaluare"
+                      title={t("evaluations.result")}
                       matchedRules={e.matchedRules}
                       rulesetVersion={e.rulesetVersion}
                       isCanary={e.isCanary}
@@ -151,6 +160,7 @@ export function EvaluationList({
                       rulesetVersion={e.rulesetVersion}
                       explanation={e.explanation}
                       matchedRules={e.matchedRules}
+                      t={t}
                     />
                   </div>
                 )}
@@ -168,11 +178,13 @@ function RuleTrace({
   rulesetVersion,
   explanation,
   matchedRules,
+  t,
 }: {
   slug: string;
   rulesetVersion: number | null;
   explanation: EvaluationExplanationStep[];
   matchedRules: string[];
+  t: TranslateFn;
 }) {
   const matched = explanation.filter((s) => s.matched);
   const considered = explanation.filter((s) => !s.matched);
@@ -182,7 +194,7 @@ function RuleTrace({
   if (explanation.length === 0 && matchedRules.length === 0) {
     return (
       <p className="mt-3 text-sm text-[var(--muted)]">
-        Nicio urmă de regulă pentru această evaluare.
+        {t("evaluations.emptyTrace")}
       </p>
     );
   }
@@ -191,10 +203,12 @@ function RuleTrace({
     <div className="mt-3 flex flex-col gap-3">
       <section>
         <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-          Reguli potrivite
+          {t("evaluations.matched")}
         </h3>
         {matched.length === 0 && matchedRules.length === 0 ? (
-          <p className="mt-1.5 text-sm text-[var(--muted)]">Niciuna</p>
+          <p className="mt-1.5 text-sm text-[var(--muted)]">
+            {t("evaluations.none")}
+          </p>
         ) : (
           <ul className="mt-1.5 flex flex-col gap-2">
             {(matched.length > 0
@@ -204,7 +218,7 @@ function RuleTrace({
                     ruleKey: key,
                     ruleName: key,
                     matched: true,
-                    reason: "Potrivită",
+                    reason: t("evaluations.matchedLabel"),
                   }),
                 )
             ).map((step) => (
@@ -226,7 +240,7 @@ function RuleTrace({
                       href={versionHref}
                       className="shrink-0 text-xs font-medium text-[var(--fg)] underline-offset-2 hover:underline"
                     >
-                      Deschide v{rulesetVersion}
+                      {t("evaluations.openVersion", { n: rulesetVersion ?? "" })}
                     </Link>
                   )}
                 </div>
@@ -246,7 +260,7 @@ function RuleTrace({
       {considered.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer font-medium text-[var(--muted)] hover:text-[var(--fg)]">
-            Alte reguli evaluate ({considered.length})
+            {t("evaluations.otherRulesCount", { n: considered.length })}
           </summary>
           <ul className="mt-2 flex flex-col gap-1.5">
             {considered.map((step) => (

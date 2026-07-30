@@ -53,9 +53,21 @@ Configure the control plane origin your shop will call (CORS):
 
 ```env
 # apps/control-plane/.env
-STOREFRONT_ORIGIN="http://localhost:3000"
+STOREFRONT_ORIGIN="http://localhost:3008"
 CONTROL_PLANE_PUBLIC_URL="http://localhost:3001"
 ```
+
+`STOREFRONT_ORIGIN` is a **comma-separated allowlist**, because one control plane
+serves many shops and each runs on its own origin:
+
+```env
+STOREFRONT_ORIGIN="http://localhost:3008,http://localhost:3009,https://shop.example"
+```
+
+The matching origin is echoed back per request, with `Vary: Origin` so a shared
+cache cannot hand one shop the header naming another. An origin that is not on
+the list is refused by the browser. `"*"` allows any origin — development only.
+Changes require a control-plane restart.
 
 ---
 
@@ -148,6 +160,17 @@ Each product includes `basePrice`, `finalPrice`, `discountPercent`, `available`,
 
 Response includes re-priced lines, `shippingOptions`, fraud preview, `viewer.authenticated`, and the current theme. Totals are server-computed.
 
+It also carries the loyalty decision for this cart:
+
+```json
+{
+  "loyalty": { "points": 50, "decision": { "matchedRules": ["loyalty-vip"], "…": "…" } },
+  "viewer": { "authenticated": true, "email": "…", "loyaltyPoints": 500, "tier": "vip" }
+}
+```
+
+`loyalty.points` is what the published rules **would** grant on checkout; `viewer.loyaltyPoints` is the balance already on the account, refreshed on every cart read so a header can show it without a second request.
+
 ### Checkout
 
 ```http
@@ -198,6 +221,17 @@ Order payloads include status, money fields, line items, and the decision traces
 | --- | --- | --- |
 | `GET` | `/profile` | Authenticated; dynamic fields from the store schema |
 | `PUT` | `/profile` | `{ "values": { "city": "Cluj", "newsletter": true } }` |
+
+`GET /profile` returns the store-defined `fields` plus the customer's loyalty standing:
+
+```json
+{
+  "fields": [ "…" ],
+  "loyalty": { "points": 500, "tier": "vip", "vipThreshold": 400 }
+}
+```
+
+Points are **per store** — the same account can be `vip` in one shop and `standard` in another. `vipThreshold` ships with the response so the shop can show the gap to the next tier without hard-coding it.
 
 `422` responses include per-field `errors` plus the updated `fields` list for inline form display.
 
@@ -267,7 +301,7 @@ Dashboard **Conexiune** shows a copy-paste clone block with your key and API URL
 - Never let the client submit prices or discounts; only choices (quantity, shipping method, profile fields).
 - Store API keys are secrets; regenerate if leaked. Prefer env vars / secret stores over committing keys.
 - Customer JWTs are separate from staff Auth.js sessions and cannot access the control-plane UI.
-- Restrict CORS with `STOREFRONT_ORIGIN` to your shop’s origin in production.
+- Restrict CORS with `STOREFRONT_ORIGIN` to the exact origins your shops run on in production; avoid `"*"`.
 
 ---
 

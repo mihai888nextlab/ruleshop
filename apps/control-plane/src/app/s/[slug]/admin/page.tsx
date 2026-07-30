@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getStoreAnalytics } from "@/lib/analytics";
 import { requireStoreRole } from "@/lib/auth";
+import { getTranslator } from "@/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
 import { formatRon } from "@/lib/utils";
@@ -20,6 +21,8 @@ export default async function StoreAdminOverviewPage({
 
   const authz = await requireStoreRole(store.id, "OPERATOR");
   if (!authz.ok) redirect(`/login?next=/s/${slug}/admin`);
+
+  const t = await getTranslator();
 
   const [
     productCount,
@@ -64,51 +67,57 @@ export default async function StoreAdminOverviewPage({
         actions={
           <>
             <Link href={`/s/${slug}/rules`}>
-              <Button>Deschide regulile</Button>
+              <Button>{t("analytics.openRules")}</Button>
             </Link>
             <Link href={`/s/${slug}`}>
-              <Button variant="outline">Vezi magazinul</Button>
+              <Button variant="outline">{t("analytics.viewStore")}</Button>
             </Link>
           </>
         }
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Produse" value={productCount} />
-        <StatCard label="Comenzi (30z)" value={analytics.orderCount} />
-        <StatCard label="Venit (30z)" value={formatRon(analytics.revenue)} />
-        <StatCard label="Evaluări (30z)" value={analytics.evaluationCount} />
+        <StatCard label={t("analytics.products")} value={productCount} />
+        <StatCard label={t("analytics.orders30")} value={analytics.orderCount} />
+        <StatCard
+          label={t("analytics.revenue30")}
+          value={formatRon(analytics.revenue)}
+        />
+        <StatCard
+          label={t("analytics.evals30")}
+          value={analytics.evaluationCount}
+        />
       </div>
 
       <section className="panel p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">
-            Analitică · 30 zile
+            {t("analytics.analytics30")}
           </h2>
           <Link
             href={`/s/${slug}/admin/analytics`}
             className="text-sm text-[var(--accent)] hover:underline"
           >
-            Detalii →
+            {t("analytics.details")}
           </Link>
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Insight
-            label="AOV"
+            label={t("analytics.aov")}
             value={formatRon(analytics.aov)}
           />
           <Insight
-            label="Top produs"
+            label={t("analytics.topProduct")}
             value={topProduct ? topProduct.name : "—"}
             hint={
               topProduct
-                ? `${topProduct.quantity} buc · ${formatRon(topProduct.revenue)}`
+                ? `${topProduct.quantity} ${t("analytics.units")} · ${formatRon(topProduct.revenue)}`
                 : undefined
             }
           />
           <Insight
-            label="Canary"
+            label={t("analytics.canary")}
             value={
               analytics.evaluationCount > 0
                 ? `${analytics.canaryPercent.toFixed(0)}%`
@@ -116,14 +125,21 @@ export default async function StoreAdminOverviewPage({
             }
             hint={
               analytics.evaluationCount > 0
-                ? `${analytics.canaryCount} din ${analytics.evaluationCount}`
+                ? t("analytics.canaryOfTotal", {
+                    canary: analytics.canaryCount,
+                    total: analytics.evaluationCount,
+                  })
                 : undefined
             }
           />
           <Insight
-            label="Regulă top"
+            label={t("analytics.topRule")}
             value={topRule ? topRule.key : "—"}
-            hint={topRule ? `${topRule.hits} potriviri` : undefined}
+            hint={
+              topRule
+                ? `${topRule.hits} ${t("analytics.matches")}`
+                : undefined
+            }
             mono
           />
         </div>
@@ -143,17 +159,19 @@ export default async function StoreAdminOverviewPage({
         <section className="panel p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight">
-              Comenzi recente
+              {t("analytics.recentOrders")}
             </h2>
             <Link
               href={`/s/${slug}/admin/orders`}
               className="text-sm text-[var(--accent)] hover:underline"
             >
-              Toate →
+              {t("analytics.allArrow")}
             </Link>
           </div>
           {recentOrders.length === 0 ? (
-            <p className="mt-6 text-sm text-[var(--muted)]">Nicio comandă încă.</p>
+            <p className="mt-6 text-sm text-[var(--muted)]">
+              {t("orders.empty")}
+            </p>
           ) : (
             <ul className="mt-4 divide-y divide-[var(--border)]">
               {recentOrders.map((order) => (
@@ -170,7 +188,7 @@ export default async function StoreAdminOverviewPage({
                     </Link>
                     <p className="text-xs text-[var(--muted)]">
                       {order.createdAt.toLocaleString("ro-RO")} ·{" "}
-                      {order.items.length} produse
+                      {order.items.length} {t("orders.productsCount")}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -198,18 +216,18 @@ export default async function StoreAdminOverviewPage({
         <section className="panel p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight">
-              Evaluări recente
+              {t("analytics.recentEvals")}
             </h2>
             <Link
               href={`/s/${slug}/rules/evaluations`}
               className="text-sm text-[var(--accent)] hover:underline"
             >
-              Istoric →
+              {t("analytics.historyArrow")}
             </Link>
           </div>
           {recentEvaluations.length === 0 ? (
             <p className="mt-6 text-sm text-[var(--muted)]">
-              Nicio evaluare încă.
+              {t("analytics.noEvalsYet")}
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-[var(--border)]">
@@ -230,12 +248,14 @@ export default async function StoreAdminOverviewPage({
                         {ev.rulesetVersion != null && (
                           <Badge tone="muted">v{ev.rulesetVersion}</Badge>
                         )}
-                        {ev.isCanary && <Badge tone="warn">canary</Badge>}
+                        {ev.isCanary && (
+                          <Badge tone="warn">{t("analytics.canary")}</Badge>
+                        )}
                       </div>
                       <p className="mt-1 truncate text-xs text-[var(--muted)]">
                         {matched.length > 0
                           ? matched.slice(0, 3).join(", ")
-                          : "fără reguli"}
+                          : t("analytics.noRulesMatched")}
                         {matched.length > 3 ? "…" : ""}
                       </p>
                     </div>
@@ -253,14 +273,16 @@ export default async function StoreAdminOverviewPage({
       <section className="panel p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Deployment</h2>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {t("analytics.deployment")}
+            </h2>
             <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-sm">
               <div className="flex gap-2">
-                <dt className="text-[var(--muted)]">Stable</dt>
+                <dt className="text-[var(--muted)]">{t("analytics.stable")}</dt>
                 <dd className="font-medium">v{dep?.stableVersion ?? "—"}</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="text-[var(--muted)]">Canary</dt>
+                <dt className="text-[var(--muted)]">{t("analytics.canary")}</dt>
                 <dd className="font-medium">
                   {dep?.canaryVersion != null
                     ? `v${dep.canaryVersion} · ${dep.canaryPercent}%`
@@ -268,15 +290,15 @@ export default async function StoreAdminOverviewPage({
                 </dd>
               </div>
               <div className="flex items-center gap-2">
-                <dt className="text-[var(--muted)]">Kill</dt>
+                <dt className="text-[var(--muted)]">{t("analytics.kill")}</dt>
                 <dd>
                   <Badge tone={killOn ? "danger" : "ok"}>
-                    {killOn ? "activ" : "normal"}
+                    {killOn ? t("analytics.killActive") : t("analytics.killNormal")}
                   </Badge>
                 </dd>
               </div>
               <div className="flex gap-2">
-                <dt className="text-[var(--muted)]">Versiuni</dt>
+                <dt className="text-[var(--muted)]">{t("analytics.versions")}</dt>
                 <dd className="font-medium">{rulesetCount}</dd>
               </div>
             </dl>
@@ -284,12 +306,12 @@ export default async function StoreAdminOverviewPage({
           <div className="flex flex-wrap gap-2">
             <Link href={`/s/${slug}/rules`}>
               <Button size="sm" variant="outline">
-                Canary / kill
+                {t("analytics.canaryKill")}
               </Button>
             </Link>
             <Link href={`/s/${slug}/admin/analytics`}>
               <Button size="sm" variant="ghost">
-                Analitică
+                {t("analytics.title")}
               </Button>
             </Link>
           </div>

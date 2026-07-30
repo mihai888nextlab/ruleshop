@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/shell";
 import { EvaluationList } from "@/components/lists/evaluation-list";
+import { getTranslator } from "@/i18n/server";
 import { requireStoreRole } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
@@ -11,6 +12,7 @@ export default async function EvaluationsPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
   const authz = await requireStoreRole(store.id, "OPERATOR");
@@ -24,7 +26,7 @@ export default async function EvaluationsPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="Istoric evaluări" />
+      <PageHeader title={t("evaluations.title")} />
       <EvaluationList
         slug={slug}
         evaluations={evaluations.map((e) => ({

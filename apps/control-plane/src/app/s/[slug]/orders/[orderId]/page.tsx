@@ -6,6 +6,7 @@ import { formatRon } from "@/lib/utils";
 import { DecisionPanel } from "@/components/decision-panel";
 import { Badge } from "@/components/ui/badge";
 import { StorefrontChrome } from "@/components/storefront-chrome";
+import { getTranslator } from "@/i18n/server";
 
 export default async function OrderDetailPage({
   params,
@@ -13,6 +14,7 @@ export default async function OrderDetailPage({
   params: Promise<{ slug: string; orderId: string }>;
 }) {
   const { slug, orderId } = await params;
+  const t = await getTranslator();
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
 
@@ -64,7 +66,9 @@ export default async function OrderDetailPage({
     <div className="flex flex-col gap-6">
       <div>
         <Badge tone="ok">{order.status}</Badge>
-        <h1 className="font-semibold tracking-tight mt-2 text-3xl">Comandă plasată</h1>
+        <h1 className="font-semibold tracking-tight mt-2 text-3xl">
+          {t("orders.placed")}
+        </h1>
         <p className="text-sm text-[var(--muted)]">
           {order.createdAt.toLocaleString("ro-RO")} · ID {order.id}
         </p>
@@ -79,22 +83,24 @@ export default async function OrderDetailPage({
           </li>
         ))}
         <li className="flex justify-between border-t border-[var(--border)] pt-2 text-sm">
-          <span>Livrare ({order.shippingMethod})</span>
+          <span>
+            {t("orders.shipping")} ({order.shippingMethod})
+          </span>
           <span>{formatRon(Number(order.shippingCost.toString()))}</span>
         </li>
         <li className="flex justify-between font-semibold">
-          <span>Total</span>
+          <span>{t("orders.total")}</span>
           <span>{formatRon(Number(order.total.toString()))}</span>
         </li>
         {order.loyaltyPointsEarned > 0 && (
           <li className="text-sm text-[var(--accent)]">
-            +{order.loyaltyPointsEarned} puncte loialitate
+            {t("orders.loyaltyPoints", { points: order.loyaltyPointsEarned })}
           </li>
         )}
       </ul>
       {trace?.shipping && (
         <DecisionPanel
-          title="Decizie livrare"
+          title={t("orders.shippingDecision")}
           matchedRules={trace.shipping.matchedRules}
           rulesetVersion={trace.shipping.rulesetVersion}
           explanation={trace.shipping.explanation}
@@ -105,7 +111,7 @@ export default async function OrderDetailPage({
       )}
       {trace?.fraud && (
         <DecisionPanel
-          title="Decizie antifraudă"
+          title={t("orders.fraudDecision")}
           matchedRules={trace.fraud.matchedRules}
           explanation={trace.fraud.explanation}
           decision={trace.fraud.decision}

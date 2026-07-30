@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useT } from "@/components/i18n-provider";
 import {
   buildContextSchema,
   isGroupCondition,
@@ -27,13 +28,13 @@ import { RuleScriptBoard } from "./rule-script-board";
  * save regardless: this copy is for feedback, not for trust.
  */
 
-const CATEGORIES: { value: DecisionType; label: string }[] = [
-  { value: "pricing", label: "Preț și reduceri" },
-  { value: "shipping", label: "Livrare" },
-  { value: "fraud", label: "Antifraudă" },
-  { value: "availability", label: "Disponibilitate" },
-  { value: "loyalty", label: "Loialitate" },
-  { value: "theme", label: "Temă" },
+const CATEGORY_VALUES: DecisionType[] = [
+  "pricing",
+  "shipping",
+  "fraud",
+  "availability",
+  "loyalty",
+  "theme",
 ];
 
 export interface RuleDraft {
@@ -85,6 +86,7 @@ export function RuleBuilder({
   onSave: (rule: unknown) => Promise<void>;
   onCancel?: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<RuleDraft>(() => ({
     key: initial?.key ?? "",
     name: initial?.name ?? "",
@@ -162,7 +164,7 @@ export function RuleBuilder({
         setSaved(true);
       } catch (cause) {
         setSaveError(
-          cause instanceof Error ? cause.message : "Salvarea a eșuat",
+          cause instanceof Error ? cause.message : t("rules.saveFailed"),
         );
       }
     });
@@ -201,7 +203,7 @@ export function RuleBuilder({
     <div className="panel flex flex-col gap-4 p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Cheie</span>
+          <span className="font-medium">{t("rules.key")}</span>
           <input
             className={inputClass}
             value={draft.key}
@@ -213,7 +215,7 @@ export function RuleBuilder({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Nume</span>
+          <span className="font-medium">{t("rules.name")}</span>
           <input
             className={inputClass}
             value={draft.name}
@@ -223,7 +225,7 @@ export function RuleBuilder({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Tip de decizie</span>
+          <span className="font-medium">{t("rules.decisionType")}</span>
           <select
             className={inputClass}
             value={draft.category}
@@ -232,16 +234,16 @@ export function RuleBuilder({
               patch({ category });
             }}
           >
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
+            {CATEGORY_VALUES.map((c) => (
+              <option key={c} value={c}>
+                {t(`rules.categories.${c}`)}
               </option>
             ))}
           </select>
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Prioritate</span>
+          <span className="font-medium">{t("rules.priority")}</span>
           <input
             type="number"
             className={inputClass}
@@ -253,7 +255,7 @@ export function RuleBuilder({
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">Descriere</span>
+          <span className="font-medium">{t("rules.description")}</span>
           <input
             className={inputClass}
             value={draft.description}
@@ -266,7 +268,7 @@ export function RuleBuilder({
             checked={draft.enabled}
             onChange={(e) => patch({ enabled: e.target.checked })}
           />
-          Activă
+          {t("rules.enabled")}
         </label>
       </div>
 
@@ -296,7 +298,7 @@ export function RuleBuilder({
       {saveError && (
         <p
           role="alert"
-          className="rounded-[var(--radius)] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-[var(--radius)] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]"
         >
           {saveError}
         </p>
@@ -310,15 +312,15 @@ export function RuleBuilder({
           title={
             validation.ok
               ? undefined
-              : "Corectează erorile semnalate înainte de salvare"
+              : t("rules.fixErrors")
           }
         >
-          {pending ? "Se salvează…" : "Salvează regula"}
+          {pending ? t("common.saving") : t("rules.saveRule")}
         </Button>
 
         {onCancel && (
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Renunță
+            {t("rules.discard")}
           </Button>
         )}
 
@@ -332,19 +334,23 @@ export function RuleBuilder({
             setShowJson((v) => !v);
           }}
         >
-          {showJson ? "Ascunde JSON" : "Vezi JSON"}
+          {showJson ? t("rules.hideJson") : t("rules.showJson")}
         </Button>
 
         {validation.ok ? (
-          <span className="text-sm text-[var(--ok)]">Regulă validă</span>
+          <span className="text-sm text-[var(--ok)]">{t("rules.validRule")}</span>
         ) : (
           <span className="text-sm text-[var(--danger)]">
             {validation.errors.length}{" "}
-            {validation.errors.length === 1 ? "problemă" : "probleme"}
+            {validation.errors.length === 1
+              ? t("rules.issue")
+              : t("rules.issues")}
           </span>
         )}
 
-        {saved && <span className="text-sm text-[var(--muted)]">Salvat.</span>}
+        {saved && (
+          <span className="text-sm text-[var(--muted)]">{t("rules.saved")}</span>
+        )}
       </div>
 
       {showJson && (
@@ -365,7 +371,7 @@ export function RuleBuilder({
             className="self-start"
             onClick={applyJson}
           >
-            Aplică JSON
+            {t("rules.applyJson")}
           </Button>
         </div>
       )}

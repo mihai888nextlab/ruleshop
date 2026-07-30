@@ -15,6 +15,8 @@ import { loadContextSchema } from "@/lib/context-schema";
 import { toRuleDefs } from "@/lib/decide";
 import { prisma } from "@/lib/prisma";
 import { getStoreBySlug } from "@/lib/store";
+import type { TranslateFn } from "@/i18n/dictionary";
+import { getTranslator } from "@/i18n/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -35,6 +37,7 @@ export default async function DiffPage({
 }) {
   const { slug } = await params;
   const query = await searchParams;
+  const t = await getTranslator();
 
   const store = await getStoreBySlug(slug);
   if (!store) notFound();
@@ -51,9 +54,9 @@ export default async function DiffPage({
     return (
       <div className="flex flex-col gap-4">
         <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
-          ← Control plane
+          {t("common.backControlPlane")}
         </Link>
-        <p className="text-[var(--muted)]">Nu există versiuni de comparat.</p>
+        <p className="text-[var(--muted)]">{t("diff.noVersions")}</p>
       </div>
     );
   }
@@ -110,23 +113,33 @@ export default async function DiffPage({
     <div className="flex flex-col gap-6">
       <div>
         <Link href={`/s/${slug}/rules`} className="text-sm text-[var(--muted)]">
-          ← Control plane
+          {t("common.backControlPlane")}
         </Link>
         <h1 className="font-semibold tracking-tight text-3xl">
-          Diferențe v{aVersion} → v{bVersion}
+          {t("diff.title", { from: aVersion, to: bVersion })}
         </h1>
         <div className="mt-2 flex flex-wrap gap-2">
-          {summary.added > 0 && <Badge tone="ok">{summary.added} adăugate</Badge>}
+          {summary.added > 0 && (
+            <Badge tone="ok">
+              {summary.added} {t("diff.added")}
+            </Badge>
+          )}
           {summary.removed > 0 && (
-            <Badge tone="warn">{summary.removed} eliminate</Badge>
+            <Badge tone="warn">
+              {summary.removed} {t("diff.removed")}
+            </Badge>
           )}
           {summary.changed > 0 && (
-            <Badge tone="accent">{summary.changed} modificate</Badge>
+            <Badge tone="accent">
+              {summary.changed} {t("diff.changed")}
+            </Badge>
           )}
-          <Badge tone="muted">{summary.unchanged} neschimbate</Badge>
+          <Badge tone="muted">
+            {t("diff.unchangedBadge", { n: summary.unchanged })}
+          </Badge>
           {changed.length > 0 && (
             <Badge tone={behavioural > 0 ? "warn" : "muted"}>
-              {behavioural} cu efect asupra deciziilor
+              {t("diff.behaviouralBadge", { n: behavioural })}
             </Badge>
           )}
         </div>
@@ -135,28 +148,30 @@ export default async function DiffPage({
       <form className="flex flex-wrap items-end gap-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
         <VersionPicker
           name="a"
-          label="De la"
+          label={t("diff.from")}
           value={aVersion}
           versions={versions}
           liveVersion={store.deployment?.stableVersion ?? null}
+          liveSuffix={t("diff.liveSuffix")}
         />
         <VersionPicker
           name="b"
-          label="La"
+          label={t("diff.to")}
           value={bVersion}
           versions={versions}
           liveVersion={store.deployment?.stableVersion ?? null}
+          liveSuffix={t("diff.liveSuffix")}
         />
         <Button type="submit" size="sm">
-          Compară
+          {t("diff.compare")}
         </Button>
         <ExplainDiffButton
           onExplain={explainVersionDiff.bind(null, slug, aVersion, bVersion)}
           disabled={!isAiConfigured() || summary.identical}
           disabledReason={
             summary.identical
-              ? "Versiunile sunt identice; nu este nimic de explicat."
-              : "Modulul AI nu este configurat (GEMINI_API_KEY lipsește)."
+              ? t("diff.nothingToExplain")
+              : t("diff.aiNotConfigured")
           }
         />
       </form>
@@ -164,25 +179,25 @@ export default async function DiffPage({
       {explanationText && (
         <section className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface)] p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide">
-            Explicație generată de model
+            {t("ai.modelExplanation")}
           </h2>
           <p className="mt-2 whitespace-pre-wrap text-sm">{explanationText}</p>
           <p className="mt-2 text-xs text-[var(--muted)]">
-            Generată din diferențele calculate mai jos, care rămân sursa de
-            adevăr. {explanation?.model ?? "model necunoscut"} ·{" "}
-            {explanation?.createdAt.toLocaleString("ro-RO")}
+            {t("diff.explanationFooter")}{" "}
+            {explanation?.model ?? "model necunoscut"} ·{" "}
+            {explanation?.createdAt.toLocaleString()}
           </p>
         </section>
       )}
 
       {summary.identical ? (
         <p className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">
-          Cele două versiuni sunt identice în privința regulilor.
+          {t("diff.identicalRules")}
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
           {changed.map((diff) => (
-            <DiffCard key={diff.key} diff={diff} />
+            <DiffCard key={diff.key} diff={diff} t={t} />
           ))}
         </ul>
       )}
@@ -191,7 +206,9 @@ export default async function DiffPage({
         <details className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4">
           <summary className="cursor-pointer text-sm text-[var(--muted)]">
             {unchanged.length}{" "}
-            {unchanged.length === 1 ? "regulă neschimbată" : "reguli neschimbate"}
+            {unchanged.length === 1
+              ? t("diff.unchangedRuleOne")
+              : t("diff.unchangedRulesMany")}
           </summary>
           <ul className="mt-3 flex flex-col gap-1">
             {unchanged.map((diff) => (
@@ -223,12 +240,14 @@ function VersionPicker({
   value,
   versions,
   liveVersion,
+  liveSuffix,
 }: {
   name: string;
   label: string;
   value: number;
   versions: { version: number; status: string; name: string | null }[];
   liveVersion: number | null;
+  liveSuffix: string;
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
@@ -241,7 +260,7 @@ function VersionPicker({
         {versions.map((version) => (
           <option key={version.version} value={version.version}>
             v{version.version} · {version.status}
-            {version.version === liveVersion ? " · live" : ""}
+            {version.version === liveVersion ? liveSuffix : ""}
           </option>
         ))}
       </select>
@@ -249,14 +268,20 @@ function VersionPicker({
   );
 }
 
-const KIND_LABEL: Record<RuleDiff["kind"], string> = {
-  added: "regulă nouă",
-  removed: "regulă eliminată",
-  changed: "modificată",
-  unchanged: "neschimbată",
-};
+function kindLabel(kind: RuleDiff["kind"], t: TranslateFn): string {
+  switch (kind) {
+    case "added":
+      return t("diff.newRule");
+    case "removed":
+      return t("diff.ruleRemovedKind");
+    case "changed":
+      return t("diff.changedKind");
+    default:
+      return t("diff.unchangedKind");
+  }
+}
 
-function DiffCard({ diff }: { diff: RuleDiff }) {
+function DiffCard({ diff, t }: { diff: RuleDiff; t: TranslateFn }) {
   const behavioural = hasBehaviouralChange(diff);
 
   const accent =
@@ -281,14 +306,15 @@ function DiffCard({ diff }: { diff: RuleDiff }) {
                 : "accent"
           }
         >
-          {KIND_LABEL[diff.kind]}
+          {kindLabel(diff.kind, t)}
         </Badge>
-        {!behavioural && <Badge tone="muted">doar text, fără efect</Badge>}
+        {!behavioural && <Badge tone="muted">{t("diff.textOnly")}</Badge>}
       </div>
 
       {diff.kind === "added" && (
         <RuleSummary
-          heading="Va fi introdusă"
+          t={t}
+          heading={t("diff.willIntroduce")}
           name={diff.after.name}
           priority={diff.after.priority}
           category={diff.after.category}
@@ -298,7 +324,8 @@ function DiffCard({ diff }: { diff: RuleDiff }) {
 
       {diff.kind === "removed" && (
         <RuleSummary
-          heading="Nu va mai exista"
+          t={t}
+          heading={t("diff.willRemove")}
           name={diff.before.name}
           priority={diff.before.priority}
           category={diff.before.category}
@@ -309,11 +336,11 @@ function DiffCard({ diff }: { diff: RuleDiff }) {
       {diff.kind === "changed" && (
         <>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            {diff.after.name} · {diff.after.category}
+            {diff.after.name} · {t(`rules.categories.${diff.after.category}` as "rules.categories.pricing")}
           </p>
           <ul className="mt-3 flex flex-col gap-3">
             {diff.changes.map((change) => (
-              <ChangeRow key={change.field} change={change} />
+              <ChangeRow key={change.field} change={change} t={t} />
             ))}
           </ul>
         </>
@@ -323,35 +350,45 @@ function DiffCard({ diff }: { diff: RuleDiff }) {
 }
 
 function RuleSummary({
+  t,
   heading,
   name,
   priority,
   category,
   enabled,
 }: {
+  t: TranslateFn;
   heading: string;
   name: string;
   priority: number;
   category: string;
   enabled: boolean;
 }) {
+  const categoryLabel = t(
+    `rules.categories.${category}` as "rules.categories.pricing",
+  );
   return (
     <p className="mt-1 text-sm text-[var(--muted)]">
-      {heading}: <span className="text-[var(--fg)]">{name}</span> · {category} ·
-      prioritate {priority} · {enabled ? "activă" : "dezactivată"}
+      {heading}: <span className="text-[var(--fg)]">{name}</span> ·{" "}
+      {categoryLabel} · {t("diff.priorityLine", { priority })} ·{" "}
+      {enabled ? t("diff.active") : t("diff.disabled")}
     </p>
   );
 }
 
-function renderValue(value: unknown, text?: string): string {
+function renderValue(
+  value: unknown,
+  t: TranslateFn,
+  text?: string,
+): string {
   if (text) return text;
-  if (typeof value === "boolean") return value ? "da" : "nu";
+  if (typeof value === "boolean") return value ? t("common.yes") : t("common.no");
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 
-function ChangeRow({ change }: { change: FieldChange }) {
+function ChangeRow({ change, t }: { change: FieldChange; t: TranslateFn }) {
   /**
    * A human rendering can be lossy — two different actions may describe
    * identically. When that happens the summary would show the same text on both
@@ -364,10 +401,10 @@ function ChangeRow({ change }: { change: FieldChange }) {
 
   const before = lossy
     ? JSON.stringify(change.before)
-    : renderValue(change.before, change.beforeText);
+    : renderValue(change.before, t, change.beforeText);
   const after = lossy
     ? JSON.stringify(change.after)
-    : renderValue(change.after, change.afterText);
+    : renderValue(change.after, t, change.afterText);
 
   return (
     <li className="flex flex-col gap-1">
@@ -375,23 +412,21 @@ function ChangeRow({ change }: { change: FieldChange }) {
         {change.label}
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
-        <div className="rounded border border-red-300/60 bg-red-500/10 px-3 py-2">
+        <div className="rounded border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-2 text-[var(--danger)]">
           <p className="text-[10px] uppercase tracking-wide text-red-700">
-            înainte
+            {t("diff.before")}
           </p>
           <p className="mt-0.5 break-words text-sm">{before}</p>
         </div>
         <div className="rounded border border-emerald-300/60 bg-emerald-500/10 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wide text-emerald-700">
-            după
+            {t("diff.after")}
           </p>
           <p className="mt-0.5 break-words text-sm">{after}</p>
         </div>
       </div>
       {lossy && (
-        <p className="text-xs text-[var(--muted)]">
-          Descrierea în limbaj natural este identică; se afișează valoarea brută.
-        </p>
+        <p className="text-xs text-[var(--muted)]">{t("diff.lossyNote")}</p>
       )}
     </li>
   );

@@ -2,12 +2,14 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { createStoreAction, type CreateStoreResult } from "@/app/actions/stores";
+import { useT } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Created = Extract<CreateStoreResult, { ok: true }>;
 
 export function CreateStoreForm() {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -45,25 +47,25 @@ export function CreateStoreForm() {
     return (
       <div className="panel flex flex-col gap-4 p-5">
         <h2 className="text-lg font-semibold">
-          Magazin creat: {created.store.name}
+          {t("createStore.created", { name: created.store.name })}
         </h2>
         <p className="text-sm text-[var(--muted)]">
-          Cont admin:{" "}
+          {t("createStore.adminAccountLabel")}:{" "}
           <code className="text-xs">{created.admin.email}</code>
           {created.adminReused
-            ? " (cont existent atașat)"
-            : " (cont nou)"}
-          . Copiază cheia API acum — nu o vom mai afișa.
+            ? ` ${t("createStore.existingAccount")}`
+            : ` ${t("createStore.newAccount")}`}
+          . {t("createStore.apiKeyWarning")}
         </p>
         <label className="flex flex-col gap-1 text-sm">
-          Cheie API
+          {t("createStore.apiKey")}
           <code className="break-all rounded bg-[var(--surface-2)] px-3 py-2 text-xs">
             {created.apiKey}
           </code>
         </label>
         <label className="flex flex-col gap-1 text-sm">
-          Comandă clone
-          <pre className="overflow-x-auto rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
+          {t("createStore.dockerCommand")}
+          <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed">
             {created.cloneCommand}
           </pre>
         </label>
@@ -73,7 +75,7 @@ export function CreateStoreForm() {
             size="sm"
             onClick={() => void navigator.clipboard.writeText(created.apiKey)}
           >
-            Copiază cheia
+            {t("createStore.copyKey")}
           </Button>
           <Button
             type="button"
@@ -83,7 +85,7 @@ export function CreateStoreForm() {
               void navigator.clipboard.writeText(created.cloneCommand)
             }
           >
-            Copiază comanda
+            {t("createStore.copyDocker")}
           </Button>
           <Button
             type="button"
@@ -91,7 +93,7 @@ export function CreateStoreForm() {
             variant="ghost"
             onClick={() => setCreated(null)}
           >
-            Închide
+            {t("createStore.close")}
           </Button>
         </div>
       </div>
@@ -100,14 +102,11 @@ export function CreateStoreForm() {
 
   return (
     <form onSubmit={onSubmit} className="panel flex flex-col gap-3 p-5">
-      <h2 className="text-lg font-semibold">Magazin nou</h2>
-      <p className="text-sm text-[var(--muted)]">
-        Creează magazinul din șablon (temă, reguli v1, schemă) plus un cont
-        STORE_ADMIN și o cheie API unică.
-      </p>
+      <h2 className="text-lg font-semibold">{t("createStore.title")}</h2>
+      <p className="text-sm text-[var(--muted)]">{t("createStore.description")}</p>
 
       <label className="flex flex-col gap-1 text-sm">
-        Nume magazin
+        {t("createStore.storeName")}
         <Input
           value={name}
           onChange={(e) => {
@@ -121,7 +120,7 @@ export function CreateStoreForm() {
         />
       </label>
       <label className="flex flex-col gap-1 text-sm">
-        Slug
+        {t("createStore.slug")}
         <Input
           value={slug}
           onChange={(e) => setSlug(e.target.value.toLowerCase())}
@@ -131,10 +130,10 @@ export function CreateStoreForm() {
       </label>
 
       <div className="mt-2 border-t border-[var(--border)] pt-3">
-        <p className="mb-2 text-sm font-medium">Administrator magazin</p>
+        <p className="mb-2 text-sm font-medium">{t("createStore.admin")}</p>
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
-            Nume
+            {t("createStore.name")}
             <Input
               value={adminName}
               onChange={(e) => setAdminName(e.target.value)}
@@ -142,7 +141,7 @@ export function CreateStoreForm() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Email
+            {t("createStore.email")}
             <Input
               type="email"
               value={adminEmail}
@@ -151,7 +150,7 @@ export function CreateStoreForm() {
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
-            Parolă
+            {t("createStore.password")}
             <Input
               type="password"
               value={adminPassword}
@@ -169,7 +168,7 @@ export function CreateStoreForm() {
         </p>
       )}
       <Button type="submit" disabled={pending} className="self-start">
-        {pending ? "Se creează…" : "Creează magazin + admin"}
+        {pending ? t("createStore.creating") : t("createStore.submit")}
       </Button>
     </form>
   );

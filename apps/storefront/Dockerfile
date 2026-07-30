@@ -4,7 +4,7 @@
 #   docker build -f apps/storefront/Dockerfile -t ruleshop-storefront:latest .
 #
 # Run (runtime config — no rebuild per store):
-#   docker run --rm -p 3000:80 \
+#   docker run --rm -p 3008:80 \
 #     -e RULESHOP_API_URL=https://control.example.com \
 #     -e RULESHOP_API_KEY=rsk_… \
 #     ruleshop-storefront:latest

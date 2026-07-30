@@ -23,6 +23,8 @@ type RuleShopContextValue = {
   cart: CartResponse | null;
   authenticated: boolean;
   itemCount: number;
+  /** Loyalty balance as of the last cart read; null while unauthenticated. */
+  loyaltyPoints: number | null;
   refreshCart: () => Promise<void>;
   signOut: () => void;
   retry: () => void;
@@ -94,6 +96,9 @@ export function RuleShopProvider({ children }: { children: ReactNode }) {
       authenticated:
         cart?.viewer.authenticated ?? Boolean(getSessionToken()),
       itemCount: cart?.lines.reduce((n, line) => n + line.quantity, 0) ?? 0,
+      loyaltyPoints: cart?.viewer.authenticated
+        ? cart.viewer.loyaltyPoints
+        : null,
       refreshCart,
       signOut,
       retry: () => setTick((n) => n + 1),
