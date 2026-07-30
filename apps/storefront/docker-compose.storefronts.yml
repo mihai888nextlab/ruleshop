@@ -1,0 +1,49 @@
+# Several storefronts against one control plane.
+#
+# Each service is one store: same image, different API key, different host port.
+# The image is static files served by nginx, so a store is chosen entirely at
+# runtime — no rebuild per shop.
+#
+#   docker compose -f apps/storefront/docker-compose.storefronts.yml up -d
+#
+# Before starting, allow every origin below on the control plane and restart it:
+#
+#   STOREFRONT_ORIGIN="http://localhost:3008,http://localhost:3009,http://localhost:3010"
+#
+# RULESHOP_API_URL is fetched by the *browser*, not by the container, so it must
+# be an address the user's machine can reach. A compose service name would not
+# resolve there — keep localhost.
+
+x-storefront: &storefront
+  image: ${RULESHOP_STOREFRONT_IMAGE:-ruleshop-storefront:latest}
+  restart: unless-stopped
+  environment:
+    RULESHOP_API_URL: ${RULESHOP_API_URL:-http://localhost:3001}
+
+services:
+  shop-fashion:
+    <<: *storefront
+    container_name: ruleshop-shop-fashion
+    ports:
+      - "3008:80"
+    environment:
+      RULESHOP_API_URL: ${RULESHOP_API_URL:-http://localhost:3001}
+      RULESHOP_API_KEY: ${FASHION_API_KEY:?set FASHION_API_KEY}
+
+  shop-electronics:
+    <<: *storefront
+    container_name: ruleshop-shop-electronics
+    ports:
+      - "3009:80"
+    environment:
+      RULESHOP_API_URL: ${RULESHOP_API_URL:-http://localhost:3001}
+      RULESHOP_API_KEY: ${ELECTRONICS_API_KEY:?set ELECTRONICS_API_KEY}
+
+  shop-third:
+    <<: *storefront
+    container_name: ruleshop-shop-third
+    ports:
+      - "3010:80"
+    environment:
+      RULESHOP_API_URL: ${RULESHOP_API_URL:-http://localhost:3001}
+      RULESHOP_API_KEY: ${THIRD_API_KEY:?set THIRD_API_KEY}

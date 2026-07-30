@@ -57,6 +57,18 @@ STOREFRONT_ORIGIN="http://localhost:3000"
 CONTROL_PLANE_PUBLIC_URL="http://localhost:3001"
 ```
 
+`STOREFRONT_ORIGIN` is a **comma-separated allowlist**, because one control plane
+serves many shops and each runs on its own origin:
+
+```env
+STOREFRONT_ORIGIN="http://localhost:3008,http://localhost:3009,https://shop.example"
+```
+
+The matching origin is echoed back per request, with `Vary: Origin` so a shared
+cache cannot hand one shop the header naming another. An origin that is not on
+the list is refused by the browser. `"*"` allows any origin — development only.
+Changes require a control-plane restart.
+
 ---
 
 ## 2. Authentication headers
@@ -289,7 +301,7 @@ Dashboard **Conexiune** shows a copy-paste clone block with your key and API URL
 - Never let the client submit prices or discounts; only choices (quantity, shipping method, profile fields).
 - Store API keys are secrets; regenerate if leaked. Prefer env vars / secret stores over committing keys.
 - Customer JWTs are separate from staff Auth.js sessions and cannot access the control-plane UI.
-- Restrict CORS with `STOREFRONT_ORIGIN` to your shop’s origin in production.
+- Restrict CORS with `STOREFRONT_ORIGIN` to the exact origins your shops run on in production; avoid `"*"`.
 
 ---
 
