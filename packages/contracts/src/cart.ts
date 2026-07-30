@@ -52,6 +52,18 @@ export const cartResponseSchema = z.object({
   blockedReason: z.string().nullable(),
   /** True when a guest cart was folded into the signed-in customer's cart. */
   merged: z.boolean(),
+  /**
+   * Who the control plane actually served this request as.
+   *
+   * The storefront cannot infer this from its own cookie: a token can be present
+   * but expired, or name an account that no longer exists, in which case the API
+   * treats the caller as a guest. Reporting it here keeps the shop's header from
+   * claiming a session the API does not recognise.
+   */
+  viewer: z.object({
+    authenticated: z.boolean(),
+    email: z.string().nullable(),
+  }),
 });
 
 export type CartResponse = z.infer<typeof cartResponseSchema>;

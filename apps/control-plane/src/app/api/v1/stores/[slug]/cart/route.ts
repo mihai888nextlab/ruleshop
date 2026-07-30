@@ -96,6 +96,7 @@ async function respondWithCart(
     },
     pricing,
     merged: cart.merged,
+    identity,
   });
 
   return NextResponse.json(cartResponseSchema.parse(body), {

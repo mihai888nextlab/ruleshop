@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { signOut } from "@/app/actions";
 import { themeToCssVars } from "@ruleshop/contracts";
 import { getCart } from "@/lib/api";
-import { hasSession } from "@/lib/session";
 
 /**
  * Store shell.
@@ -24,9 +23,17 @@ export default async function StoreLayout({
 }) {
   const { slug } = await params;
 
-  const [cart, signedIn] = await Promise.all([getCart(slug), hasSession()]);
+  const cart = await getCart(slug);
 
   if (!cart.ok && cart.status === 404) notFound();
+
+  /**
+   * Whether the customer is signed in is the API's answer, not this app's cookie.
+   * A token can be present but expired, or name an account that no longer
+   * exists — in which case the control plane serves the request as a guest, and a
+   * header claiming otherwise would offer actions that then fail.
+   */
+  const signedIn = cart.ok ? cart.data.viewer.authenticated : false;
 
   const themeId = cart.ok ? cart.data.store.theme.themeId : "default";
 

@@ -371,6 +371,7 @@ export function buildCartResponse(input: {
   storeContext: CartResponse["store"];
   pricing: CartPricing;
   merged: boolean;
+  identity: ApiIdentity;
 }): CartResponse {
   const { pricing } = input;
   const options = shippingOptionsFrom(pricing.shipping.decision);
@@ -398,6 +399,10 @@ export function buildCartResponse(input: {
     fraudDecision: decisionMeta(pricing.fraud),
     blockedReason,
     merged: input.merged,
+    viewer: {
+      authenticated: input.identity.kind === "user",
+      email: input.identity.kind === "user" ? input.identity.email : null,
+    },
   };
 }
 

@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "./prisma";
 
 /**
  * Identity for the storefront-facing API.
@@ -94,14 +95,35 @@ export async function resolveApiIdentity(
   if (bearer) {
     const claims = await verifyCustomerToken(bearer);
     if (claims) {
-      return {
-        kind: "user",
-        userId: claims.userId,
-        email: claims.email,
-        subjectKey: `user:${claims.userId}`,
-      };
+      /**
+       * A validly signed token can still name a subject that no longer exists —
+       * the account was deleted, or the database was rebuilt while a browser kept
+       * its cookie. Trusting the signature alone would hand every downstream
+       * caller a userId that violates its foreign keys, which surfaces as an
+       * opaque 500 rather than as "not signed in".
+       *
+       * One primary-key lookup per authenticated request is a fair price for
+       * that, and it also means a deleted account's token stops working at once
+       * instead of when it expires.
+       */
+      const subject = await prisma.user.findUnique({
+        where: { id: claims.userId },
+        select: { id: true },
+      });
+
+      if (subject) {
+        return {
+          kind: "user",
+          userId: claims.userId,
+          email: claims.email,
+          subjectKey: `user:${claims.userId}`,
+        };
+      }
     }
   }
+
+  // No token, an unverifiable one, or one naming a subject that is gone: this
+  // request is anonymous and continues as a guest.
 
   const guestId = normaliseGuestId(request.headers.get("x-guest-id"));
   return { kind: "guest", guestId, subjectKey: `guest:${guestId}` };
